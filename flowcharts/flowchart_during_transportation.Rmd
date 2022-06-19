@@ -1,0 +1,122 @@
+---
+title: "EmergencyProcess_Flowchart_InfusionDuringTransportation"
+author: "Milla Juntunen"
+date: '2022-06-19'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(DiagrammeR)
+
+grViz(diagram = "digraph flowchart {
+  node [fontname = arial, shape = box, style = filled, color = orange]
+  
+  # Using numbers is still a stupid way to do this. Figure out something else. 
+  
+  # NODES OF THE PLOT
+  # Start of the plot
+  tab1 [label = '@@1']
+  tab2 [label = '@@2']
+  
+  node [fontname = arial, shape = box, style = filled, color = lightblue]
+  # Vehicles leaving the base/other and arrival
+  
+  tab3 [label = '@@3']
+  tab4 [label = '@@4']
+  tab5 [label = '@@5']
+  tab6 [label = '@@6']
+  tab7 [label = '@@7']
+  
+  # On-scene 'treatment'
+  node [fontname = arial, shape = box, style = filled, color = yellowgreen]
+  
+  tab8 [label = '@@8']
+  tab9 [label = '@@9']
+  
+  
+  # Transportation, staff change, infusion starts
+  # (Assuming that the fire truck is not used to transport patients)
+  # Transportation time starts
+  node [fontname = arial, shape = box, style = filled, color = yellow]
+  
+  tab10 [label = '@@10']
+  tab11 [label = '@@11']
+  tab12 [label = '@@12']
+  
+  tab13 [label = '@@13'] 
+  
+  tab14 [label = '@@14']
+  tab15 [label = '@@15']
+  tab16 [label = '@@16']
+  
+  # Arrival to hospital
+  # Assuming that the time of arrival is part of the transportation (color!)
+  tab17 [label = '@@17']
+  # Transportation time ends
+  node [fontname = arial, shape = box, style = filled, color = orange]
+  tab18 [label = '@@18']
+  
+  # EDGES BETWEEN NODES:
+  
+  tab1 -> tab2[label = '? min']; # 112 Call - Risk analysis
+  
+  tab2 -> tab3[label = '90 sec']; # Risk analysis - Ambulance leaving
+  tab2 -> tab4[label = '90 sec']; # Risk analysis - Ambulance + doctor leaving
+  tab2 -> tab5[label = '~5 min']; # Risk analysis - Helicopter leaving
+  tab2 -> tab6[label = '? min']; # Risk analysis - Fire truck leaving
+  
+  tab3 -> tab7[label = '20-40 min']; # Ambulance leaving - On the scene
+  tab4 -> tab7[label = '20-40 min']; # Ambulance + doctor leaving - On the scene
+  tab5 -> tab7[label = '? min']; # Helicopter leaving - On the scene
+  tab6 -> tab7[label = '? min']; # Fire truck leaving - On the scene
+  
+  tab7 -> tab8[label = '? min']; # On the scene - Meeting the patient
+  tab8 -> tab9[label = '1-20 min']; # Meeting the patient - Packing
+  
+  tab9 -> tab10[label = '~2 min']; # Packing - Ambulance leaving the scene
+  tab9 -> tab11[label = '~2 min']; # Packing - Ambulance + doctor leaving the scene
+  tab9 -> tab12[label = '? min']; # Packing - Helicopter leaving the scene
+  
+  # Staff change:
+  tab10 -> tab13[label = '? min']; # Ambulance leaving the scene - Doctor changes vehicle
+  tab5 -> tab13[label = '? min']; # Helicopter leaving - Doctor changes vehicle
+  
+  #Infusions starts
+  tab10 -> tab14[label = '? min']; # Ambulance leaving the scene - Infusion starts (ambulance/doctor changes vehicle)
+  tab11 -> tab15[label = '? min']; # Ambulance + doctor leaving the scene - Infusion starts (ambulance + doctor)
+  tab12 -> tab16[label = '? min']; # Helicopter leaving the scene - Infusion starts (helicopter)
+  tab13 -> tab14[label = '? min']; # Doctor changes vehicle - Infusion starts (ambulance/doctor changes vehicle)
+  
+  # Arrival to hospital & Shock room
+  tab14 -> tab17[label = '? min']; # Infusion starts (ambulance/doctor changes vehicle) - At hospital
+  tab15 -> tab17[label = '? min']; # Infusion starts (ambulance +doctor) - At hospital
+  tab16 -> tab17[label = '? min']; # Infusion starts (helicopter) - At hospital
+  
+  tab17 -> tab18[label = '? min']; # At hospital - Shock Room
+  
+}  
+  [1]: '112 Call received'
+  [2]: 'Risk analysis'
+  [3]: 'Ambulance leaves'
+  [4]: 'Ambulance + Doctor leaves'
+  [5]: 'Helicopter leaves'
+  [6]: 'Fire truck leaves'
+  [7]: 'Arrival on the scene'
+  [8]: 'Meeting the patient'
+  [9]: 'Packing'
+  [10]: 'Ambulance leaves the scene'
+  [11]: 'Ambulance + Doctor leaves the scene'
+  [12]: 'Helicopter leaves the scene'
+  [13]: 'Doctor from helicopter to ambulance'
+  [14]: 'Infusion starts'
+  [15]: 'Infusion starts'
+  [16]: 'Infusion starts'
+  [17]: 'Arrival to hospital'
+  [18]: 'Arrival to Shock room'
+  
+  ")
+```
