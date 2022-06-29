@@ -1,0 +1,66 @@
+---
+title: "testing-distributions"
+author: "Milla Juntunen"
+date: '2022-06-29'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("readxl")
+library("dplyr")
+
+parse_file.function <- function(file_location, sheet_name) {
+  
+  df <- na.omit(read_excel(file_location, sheet_name))
+  print(df)
+  
+  # Making empty list
+  list_data <- list()
+  
+  # Counting rows
+  rows = nrow(df) 
+  row <- 1
+  
+  # Reading the excel row by row
+  for (row in 1:rows){
+    
+    # Reading data from a row
+    row_data <- df[row,]
+    
+    #Parsing:
+    
+    # Defining the edge between nodes in flowchart and/or excel
+    from <- as.character(select(row_data, from))
+    to <- as.character(select(row_data, to))
+    edge_name <- paste(from, to, sep = " - ")
+    
+    # Limits for the times between events
+    lower <- as.numeric(select(row_data, start))
+    upper <- as.numeric(select(row_data, end))
+      
+    # Listing parsed information
+    list_data[row] <- list(c(from, to, edge_name, lower, upper))
+  }
+  return(list_data)
+}
+
+file_location <- "C:\\Projektit\\whole_blood_research\\excel\\EmergencyProcess_EdgeTimes.xlsx"
+
+sheet_name_a <- "test_times_a"
+sheet_name_b <- "test_times_b"
+
+list_data_a = parse_file.function(file_location, sheet_name_a)
+list_data_b = parse_file.function(file_location, sheet_name_b)
+
+cat("Printing listed data from chart A (infusion starts on the scene)\n\n")
+print(list_data_a)
+
+cat("Printing listed data from chart B (infusion starts during transport)\n\n")
+print(list_data_b)
+
+```
+

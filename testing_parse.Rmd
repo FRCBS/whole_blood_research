@@ -1,0 +1,54 @@
+---
+title: "testing_parse"
+author: "Milla Juntunen"
+date: '2022-06-29'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+library("readxl")
+library("dplyr")
+
+file_location <- "C:\\Projektit\\whole_blood_research\\excel\\EmergencyProcess_EdgeTimes.xlsx"
+sheet_name <- "test_times_a"
+
+df = na.omit(read_excel(file_location, sheet_name))
+
+# Making empty list
+list_data <- list()
+  
+# Counting rows
+rows = nrow(df) 
+row <- 1
+  
+# Reading the excel row by row
+for (row in 1:rows){
+  
+  # Row number must be used to rad a specific row in df
+  row_data <- df[row,]
+  
+  from <- as.character(select(row_data, from))
+  to <- as.character(select(row_data, to))
+  edge_name <- paste(from, to, sep = " - ")
+
+  lower <- as.numeric(select(row_data, start))
+  upper <- as.numeric(select(row_data, end))
+  
+  list_data[row] <- list(c(from, to, edge_name, lower, upper))
+}
+
+#Checking if the data is correctly listed
+
+for (i in seq_along(1:length(list_data))){
+  for(j in seq_along(1: length(list_data[[1]]))){
+    print(unlist(list_data[[i]][[j]]))  
+  }
+}
+  
+```
+
