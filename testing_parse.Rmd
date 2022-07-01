@@ -10,7 +10,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-
 library("readxl")
 library("dplyr")
 
@@ -49,6 +48,59 @@ for (i in seq_along(1:length(list_data))){
     print(unlist(list_data[[i]][[j]]))  
   }
 }
+```
+
+
+```{r}
+# Random playing with the data
+
+set.seed(2)
+data <- list_data
+total_time <- 0
+from <- "Risk analysis"
+to <- "Fire truck leaving"
+stop_sign <- "Meeting the patient"
+
+for (i in 1:length(data)){
+
+if(from == stop_sign) {break}
+# Getting the "from" and "to" from the data list
+row <- data[i]
+data_from <- as.character(lapply(row,'[[',1))
+data_to <- as.character(lapply(row,'[[',2))
+
+#Comparing the datas. If those match, then getting the distribution limits. 
+if(data_from == from && data_to == to) { 
+  lower <- as.numeric(lapply(row,'[[',4))
+  upper <- as.numeric(lapply(row,'[[',5))
   
+  # Updating the total_time_calculator
+  random_time <- runif(1, lower, upper)
+  total_time <- total_time + random_time
+  
+  # Some printing to see if this works at all
+  print(" ")
+  cat(as.character(lapply(row,'[[',3)),"\n")
+  cat(lower, " is the lower limit for the distribution\n")
+  cat(upper, " is the upper limit for the distribution\n")
+  cat(random_time, " was the randomized number between limits\n")
+  cat(total_time, " is the time that has now passed")
+  print(" ")
+  
+  # Getting the next node, this is not the best way to do it
+  # "to" is the next "from"
+  # Must find the other "to", done below
+  from <- to
+  print(from)
+  for (j in 1:length(data)){
+    row <- data[j]
+    data_from <- as.character(lapply(row,'[[',1))
+    if(data_from == from){
+      to <- as.character(lapply(row,'[[',2))
+    }
+  }
+}
+}
+
 ```
 
