@@ -1,5 +1,5 @@
 ---
-title: "testing-distributions"
+title: "parsing_edgetimes_excel"
 author: "Milla Juntunen"
 date: '2022-06-29'
 output: html_document
@@ -32,7 +32,7 @@ parse_file.function <- function(file_location, sheet_name) {
     # Reading data from a row
     row_data <- df[row,]
     
-    #Parsing:
+    # Parsing the Excel:
     
     # Defining the edge between nodes in flowchart and/or excel
     from <- as.character(select(row_data, from))
@@ -43,8 +43,12 @@ parse_file.function <- function(file_location, sheet_name) {
     lower <- as.numeric(select(row_data, start))
     upper <- as.numeric(select(row_data, end))
 
+     # Probability for the edge
+    probability <- as.numeric(select(row_data, probability))
+    
     # Listing parsed information
-    list_data[row] <- list(c(from, to, edge_name, lower, upper))
+    list_data[row] <- list(c(from, to, edge_name, lower, upper, probability))
+
   }
   return(list_data)
 }
@@ -57,12 +61,16 @@ draw_vehicle.function <- function(from){
   vehicles_to <- c("Ambulance", "Ambulance and doctor", "Helicopter", "Fire truck")
   vehicles_from <- c("Ambulance", "Ambulance and doctor", "Helicopter")
   
+  # Probabilities for each vehicle used
+  probs_to <- c(0.4, 0.3, 0.25, 0.05)
+  probs_from <- c(0.5, 0.3, 0.2)
+  
   # Drawing a vehicle depending on a current node
   if(from == "Risk analysis"){
-    vehicle <- vehicles_to[sample(1:length(vehicles_to), 1)]
+    vehicle <- as.character(sample(vehicles_to, 1, replace = FALSE, probs_to))
     cat(vehicle, " is the vehicle to rush to the scene!\n")
   } else if (from == "Packing"){
-    vehicle <- vehicles_from[sample(1:length(vehicles_from), 1)]
+    vehicle <- as.character(sample(vehicles_from, 1, replace = FALSE, probs_from))
     cat(vehicle, " is the vehicle to rush to the hospital!\n")
   }
   return(vehicle)
@@ -89,8 +97,9 @@ check_vehicle.function <- function(vehicle, list_data, from){
       
       if(vehicle == "Ambulance" && comp_check == FALSE){
         to <- data_to
-        break
-      } else { 
+        #cat(to, "is the place where Ambulance is going\n")
+        #break
+      } else if (vehicle != "Ambulance"){ 
       to <- data_to 
       }
     }
@@ -106,16 +115,16 @@ time_calculator.function <- function(from_to, total_time_count, infusion_time_co
   
   # Calculating the time between events (nodes)
   
-  stop_sign <- "Shock Room"
+  #stop_sign <- "Shock Room"
   need_vehicle_check <- TRUE
   from <- from_to[1]
   to <- from_to[2]
   
-  # Going trough data_list
+  # Going through list_data
   for (i in 1:length(list_data)){
   
     # Checking if it is time to stop and exit the loop
-    if(from == stop_sign) {break}
+    #if(from == stop_sign) {break}
   
     # Checking if vehicle check is needed
     if(from == "Packing" && need_vehicle_check){
@@ -134,7 +143,7 @@ time_calculator.function <- function(from_to, total_time_count, infusion_time_co
     # Could always pass a variable :'D
     #doesn't work at this point!
     if (chart_to_follow == "chart b" && from == "Infusion starts"){
-      from_to <- from_to <- check_vehicle.function(vehicle, list_data, from)
+      from_to <- check_vehicle.function(vehicle, list_data, from)
       from <- from_to[1]
       to <- from_to[2]
     }
@@ -149,14 +158,14 @@ time_calculator.function <- function(from_to, total_time_count, infusion_time_co
       lower <- as.numeric(lapply(row,'[[',4))
       upper <- as.numeric(lapply(row,'[[',5))
       
+      # Updating the total_time_count
+      random_time <- runif(1, lower, upper)
+      total_time_count <- total_time_count + random_time
+      
       # Checking if the infusion has started
       if(from == "Infusion starts"){
         infusion_starts <- TRUE
       }
-      
-      # Updating the total_time_count
-      random_time <- runif(1, lower, upper)
-      total_time_count <- total_time_count + random_time
     
       #If infusion has started, updating also infusion_time_count
       if(infusion_starts == TRUE) {
@@ -164,25 +173,43 @@ time_calculator.function <- function(from_to, total_time_count, infusion_time_co
       }
     
       # Some printing to see if this works at all
-      cat("\n")
-      cat(as.character(lapply(row,'[[',3)),"\n")
-      cat(lower, " is the lower limit for the time distribution\n")
-      cat(upper, " is the upper limit for the time distribution\n")
-      cat(random_time, " is the randomized time between limits\n")
-      cat(total_time_count, " is the total time that has passed\n")
-      cat(infusion_time_count, " is the time that has passed since the infusion started\n\n")
+      #cat("\n")
+      #cat(as.character(lapply(row,'[[',3)),"\n")
+      #cat(lower, " is the lower limit for the time distribution\n")
+      #cat(upper, " is the upper limit for the time distribution\n")
+      #cat(random_time, " is the randomized time between limits\n")
+      #cat(total_time_count, " is the total time that has passed\n")
+      #cat(infusion_time_count, " is the time that has passed since the infusion started\n\n")
    
       # "to" is the next "from"
       from <- to
       
       # Getting the next node, this is not the best way to do it
-      # Must find the other "to", done below
-      cat(from, "\n")
+      # Must find the other "to", done below. Checking if multiple next nodes exists and drawing one with given probabilities.
+      
+      match_count <- 0
+      possible_to <- list()
+      probs <- list()
+      
       for (j in 1:length(list_data)){
         row <- list_data[j]
         data_from <- as.character(lapply(row,'[[',1))
+        
         if(data_from == from){
+          
+          # Match found, so increasing the match_count and saving the "to" in a list
+          match_count <- match_count + 1
+          
           to <- as.character(lapply(row,'[[',2))
+          possible_to <- append(possible_to, to)
+          
+          prob <- as.numeric(lapply(row,'[[',6))
+          probs <- append(probs, prob)
+          
+          # Drawing to from the list "possible_to"
+          if(match_count > 1){
+            to <- as.character(sample(possible_to, 1, replace = FALSE, probs))
+          }
         }
       }
     }
@@ -212,6 +239,13 @@ list_data_b <- parse_file.function(file_location, sheet_name_b)
 #cat("Printing listed data from chart_b (infusion starts during transport)\n\n")
 #print(list_data_b)
 
+set.seed(2)
+for (i in 1:20){
+
+infusion_starts <- FALSE
+total_time_count <- 0
+infusion_time_count <- 0
+
 # Drawing whether the infusion starts on the scene (chart_a) or during transportation (chart_b)
 charts <- c("chart a", "chart b")
 chart_to_follow <- charts[sample(1:length(charts),1)]
@@ -234,7 +268,8 @@ current_stage <- time_calculator.function(from_to, total_time_count,infusion_tim
 total_time_count <- as.numeric(current_stage[3])
 infusion_time_count <- as.numeric(current_stage[4])
 cat("Patient transported to Shock Room!\n")
-cat(total_time_count, "is the total time from the Risk Analysis\n")
-cat(infusion_time_count, "is the total time from the Infusion Starts\n")
+cat(total_time_count, "is the total time from the 'Risk Analysis'\n")
+cat(infusion_time_count, "is the total time from the 'Infusion Starts'\n\n")
+}
 ```
 
