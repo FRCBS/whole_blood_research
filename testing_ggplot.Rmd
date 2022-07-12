@@ -8,100 +8,146 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-Luetaan excelistä rivejä. Tulisi kehittää jokin kiva keino, miten saisi muokattua sitä, mistä datasta kuvaajaa piirretään.
 
 
 ```{r}
+source("parsing_edgetimes_excel_version2.R")
 library("readxl")
 library("ggplot2")
 library("dplyr")
+library("npreg")
+
+# Reading the data from excel
 
 df <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", sheet = "yritys")
 
-# Filtering rows (only someof them are useful at the time)
 
-PRCBS_data <- filter(df, products == "O-negative PRBCs" )
-PRCBS_and_plasma_data <- filter(df, products == "plasma and/or RBCs" )
+# Filtering rows (only some of them are useful at a time)
+
+
+PRBCS_and_plasma_data <- filter(df, products == "plasma and/or RBCs" )
 
 
 print(df)
 
-print(PRCBS_data)
-print(PRCBS_and_plasma_data)
-#transfusion_data  <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", range = "yritys!D1:E4")
-
-
+print(PRBCS_data)
+print(PRBCS_and_plasma_data)
 ```
-Piirretään pelkästä punasoludatasta kuvaaja, oletuksella että tämä himmeli osaa jutella noiden chunkien välillä. 
 
 ```{r}
-# Testing whether selecting only two columns helps to overcome a problem with ggplot
-#PRCBS <- select(PRCBS_data, time, mortality)
-#print(PRCBS)
-ggplot(data = PRCBS_data, aes(x = time, y = mortality)) +
-  geom_point()
+# Filtering rows (only some of them are useful at a time)
+PRBCS_data <- filter(df, products == "O-negative PRBCs" )
+print(PRBCS_data)
 
-```
-Siitä tuli erittäin hieno :D Yritetään sovittaa tähän jokin käyrä
-
-```{r}
-
-linear.model <-lm(mortality ~ time, PRCBS_data)
-log.model <-lm(log(mortality) ~ time, PRCBS_data)
-#exp.model <-lm(mortality ~ exp(time), PRCBS_data) 
-# code above doesn't work due to some singularity in the data (2 same time points is the problem, I guess)
-
-log.model.prbcs <- data.frame(x = PRCBS_data$time,
-                           y = exp(fitted(log.model)))
-
-#log.model.prcbs_plasma <- data.frame(x = PRCBS_and_plasma_data$x,
-                          # y = exp(fitted(log.model)))
-
-
-
-ggplot(PRCBS_data, aes(x = time, y = mortality) ) +
+# Drawing points from the PRCB data
+ggplot(PRBCS_data, aes(x = time, y = mortality) ) +
     geom_point() +
-    geom_smooth(aes(color="Method or formula not specified"), se=FALSE, linetype = 1) +
-    geom_smooth(method="lm", aes(color="Linear Model"), formula= (y ~ x), se=FALSE, linetype = 2) +
-    geom_smooth(method="lm", aes(color="2. degree polynome"), formula= (y ~ poly(x,2)), se=FALSE, linetype = 3) +
-    geom_smooth(method="lm", aes(color="Exp Model"), formula= (y ~ exp(x)), se=FALSE, linetype = 4) +
-    geom_line(data = log.model.prbcs, aes(x, y, color = "Log Model"), size = 1, linetype = 5) + 
+    geom_line() +
+    geom_smooth(aes(color="No special method or formula"), se = FALSE,  linetype = 1) +
+    geom_smooth(method="lm", aes(color="Linear Model"), formula= (y ~ x), se = FALSE, linetype = 2) +
+    geom_smooth(method="lm", aes(color="2. deg polynome"), formula= (y ~ poly(x,2)), se = FALSE, linetype = 3) +
+    geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 3) +
     guides(color = guide_legend("Model Type"))
 
-#ggplot(PRCBS_and_plasma_data, aes(x = time, y = mortality)) +
-     #geom_point()+
-     #geom_smooth(se = FALSE, color = 2)
-     #geom_smooth(method = "lm", formula = (y ~ exp(x)), se = FALSE)
+# According to the pictures made from code above, it seems that the log model has the best match to data points (not a good model but using it anyway)
 
+# Plotting data from the excel
+ggplot(data = PRBCS_data, aes(x = time, y = mortality)) + 
+  geom_point() +
+  geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 1)+
+  guides(color = guide_legend("Model Type"))
+
+# Making simulated data
+simulated_times <- make_timepoints.function(20)
+my_model <- lm(mortality~log(time), data = PRBCS_data)
+variable_time <- data.frame(time=simulated_times)
+predicted_y <- predict(object = my_model, newdata = variable_time)
+
+# Making combined dataframe from original and simulated data
+original.data <- data.frame(time = PRBCS_data$time, mortality = PRBCS_data$mortality)
+simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
+all.data <- rbind(original.data, simulation.data)
+
+# Plotting the combined data and the simulated and original points
+ggplot(all.data, aes(x = time, y = mortality))+
+  geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 1)+
+  geom_point(data = original.data) +
+  geom_point(data = simulation.data, color = "blue")+
+  guides(color = guide_legend("Model Type"))
 
 ```
-No siitä ei tosiaan tullut ihan niin hieno :DDDD Ei lainkaan pielessä tai mitään :D KUOLEN
-- ei toimi kolmannen asteen polynomille, lakkaa piirtämästä korkeammilla asteilla
-Sama yhdistelmälle punasolut+plasma
+
+
 ```{r}
-linear.model <-lm(mortality ~ time, PRCBS_and_plasma_data)
-log.model <-lm(log(mortality) ~ time, PRCBS_and_plasma_data)
-log.model.prbcs <- data.frame(x = PRCBS_and_plasma_data$time,
-                           y = exp(fitted(log.model)))
+# Same for PRBCS_and_plasma_data:
+PRBCS_and_plasma_data <- filter(df, products == "plasma and/or RBCs" )
+print(PRBCS_and_plasma_data)
 
-# Trying different curves (lol this is sooo wroong)
-
-ggplot(PRCBS_and_plasma_data, aes(x = time, y = mortality) ) +
+# Fitting different curves (lol this is sooo wroong)
+ggplot(PRBCS_and_plasma_data, aes(x = time, y = mortality) ) +
     geom_point() +
-    geom_smooth(aes(color="Method or formula not specified"), se=FALSE, linetype = 1) +
-    geom_smooth(method="lm", aes(color="Linear Model"), formula= (y ~ x), se=FALSE, linetype = 2) +
-    geom_smooth(method="lm", aes(color="2. degree polynome"), formula= (y ~ poly(x,2)), se=FALSE, linetype = 3) +
-    geom_smooth(method="loess", aes(color="Exp Model"), formula= (y ~ exp(x)), se=FALSE, linetype = 5) +
-    geom_line(data = log.model.prbcs, aes(x, y, color = "Log Model"), size = 1, linetype = 6) + 
+    geom_line() +
+    geom_smooth(aes(color="No special method or formula"), se = FALSE,  linetype = 1) +
+    geom_smooth(method="lm", aes(color="Linear Model"), formula= (y ~ x), se = FALSE, linetype = 2) +
+    geom_smooth(method="lm", aes(color="2. deg polynome"), formula= (y ~ poly(x,2)), se = FALSE, linetype = 3) +
+    geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 3) +
     guides(color = guide_legend("Model Type"))
 
+# Making simulated data (using same simulated time points as earlier)
+my_model <- lm(mortality~log(time), data = PRBCS_and_plasma_data)
+variable_time <- data.frame(time=simulated_times)
+predicted_y <- predict(object = my_model, newdata = variable_time)
+
+# Making combined data frame from original and simulated data
+original.data <- data.frame(time = PRBCS_and_plasma_data$time, mortality = PRBCS_and_plasma_data$mortality)
+simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
+all.data <- rbind(original.data, simulation.data)
+
+# Plotting the combined data and the simulated and original points
+ggplot(all.data, aes(x = time, y = mortality))+
+  geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 1)+
+  geom_point(data = original.data) +
+  geom_point(data = simulation.data, color = "blue")+
+  guides(color = guide_legend("Model Type"))
+
+
 
 ```
-No ei tullut kaunista tästäkään, kolmannen asteen polynomi on negaa ja laittaa muut lyttyyn, korkeammat ei piirry
-Piirretään sama vielä kokoverelle:
 ```{r}
+# Same for whole blood:
 WB_data <- filter(df, products == "LTOWB" )
 print(WB_data)
+
+# Fitting different curves (lol this is sooo wroong)
+ggplot(WB_data, aes(x = time, y = mortality) ) +
+    geom_point() +
+    geom_line() +
+    geom_smooth(aes(color="No special method or formula"), se = FALSE,  linetype = 1) +
+    geom_smooth(method="lm", aes(color="Linear Model"), formula= (y ~ x), se = FALSE, linetype = 2) +
+    geom_smooth(method="lm", aes(color="2. deg polynome"), formula= (y ~ poly(x,2)), se = FALSE, linetype = 3) +
+    geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 3) +
+    guides(color = guide_legend("Model Type"))
+
+# Making simulated data (using same simulated time points as earlier)
+my_model <- lm(mortality~log(time), data = WB_data)
+variable_time <- data.frame(time=simulated_times)
+predicted_y <- predict(object = my_model, newdata = variable_time)
+
+# Making combined data frame from original and simulated data
+original.data <- data.frame(time = WB_data$time, mortality = WB_data$mortality)
+simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
+all.data <- rbind(original.data, simulation.data)
+
+# Plotting the combined data and the simulated and original points
+ggplot(all.data, aes(x = time, y = mortality))+
+  geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 1)+
+  geom_point(data = original.data) +
+  geom_point(data = simulation.data, color = "blue")+
+  guides(color = guide_legend("Model Type"))
+```
+Well I guess that there cannot be negative mortality, so this model is pretty bad. 
+```{r}
+
 
 linear.model <-lm(mortality ~ time, WB_data)
 log.model <-lm(log(mortality) ~ time, WB_data)
@@ -118,4 +164,4 @@ ggplot(WB_data, aes(x = time, y = mortality) ) +
     guides(color = guide_legend("Model Type"))
 
 ```
-Lol ihan kauheaa kuraa. Pitänee kokeilla sitä keskiarvojen ottamista. 
+
