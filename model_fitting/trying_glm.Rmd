@@ -1,0 +1,184 @@
+---
+title: "trying_glm"
+author: "Milla Juntunen"
+date: '2022-07-13'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+*** TRYING TO USE GLM FOR CURVE FITTING ***
+
+This code tries to use the glm() to model the mortality rate after giving prehospital blood transfusions. This code is a work in process, not ready due to some problems described below.
+
+```{r}
+library("ggfortify")
+library("readxl")
+library("ggplot2")
+library("dplyr")
+library("npreg")
+library("ggformula")
+```
+
+Reading data from excel. Trying first with data that uses PRBCs (packed red blood cells) for prehospital transfusion. Y axis has the mortality percentage, X-axis the time in minutes. 
+
+```{r}
+# Reading the data from excel (time in minutes AND PROBABILITIES IN DECIMAL NUMBER)
+df <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", sheet = "Sheet1")
+PRBCS_data <- filter(df, products == "O-negative PRBCs" )
+
+print(PRBCS_data)
+```
+
+Testing different models to see which one is the best fit. First mortality ~ log(time), without link functions.
+
+```{r}
+p <- glm(mortality ~ log(time), data = PRBCS_data)
+p
+```
+
+
+```{r}
+autoplot(p) # for mortality ~ log(time)
+```
+Trying then with mortality ~ time, using gaussian and log link
+
+```{r}
+p <- glm(mortality ~ time, data = PRBCS_data, family = gaussian(link="log"))
+p
+```
+
+
+```{r}
+autoplot(p) # for gaussian(link = "log")
+```
+Trying mortality ~ time, usin Gamma with log link
+
+```{r}
+p <- glm(mortality ~ time, data = PRBCS_data, family = Gamma(link="log"))
+p
+```
+
+
+```{r}
+autoplot(p) # for gamma(link = "log")
+```
+
+Gamma has the best AIC so using it to predict new values..? This is very confusing. It is not the smallest AIC but somehow it was still thought to be the best one. Random, should probably discuss about this. This might be caused by the mistakes in excel that are now hopefully all corrected.
+
+Anyway, trying to simulate new datapoints with the mortality ~ time with gamma and log link, trying to see the curve that this simulation makes (didn't add any bias for that reason)
+
+```{r}
+# Plotting the combined data and the simulated and original points
+
+# Trying to use this model
+p <- glm(mortality ~ time, data = PRBCS_data, family = Gamma(link = "log"))
+
+# Making timepoints in every 6 hours
+variable_time <- data.frame(time=seq(0, 40500, by=420))
+tmp <- predict(object = p, newdata = variable_time, type="response")
+
+simulation.data <- data.frame(time = variable_time, mortality = tmp)
+ggplot(simulation.data, aes(x = time, y = mortality))+
+  geom_point() + geom_point(data = PRBCS_data, color = "blue")
+```
+That doesn't seem a good fit to original data. The curve should be other way round?
+
+Trying for curiosity to use mortality ~log(time) with gamma and log link.
+```{r}
+
+# Plotting the combined data and the simulated and original points again
+# This makes a curve (why? or why the first one didn't work???)
+p <- glm(mortality ~ log(time), data = PRBCS_data, family = Gamma(link = "log"))
+p
+# Making timepoints
+variable_time <- data.frame(time=seq(0, 40500, by=420))
+tmp <- predict(object = p, newdata = variable_time, type="response")
+
+simulation.data <- data.frame(time = variable_time, mortality = tmp)
+ggplot(simulation.data, aes(x = time, y = mortality))+
+  geom_point() + geom_point(data = PRBCS_data, color = "blue")
+
+```
+Seems better, but don't know if it is anywhere near correct to do it in that way. The big question is why the first curve doesn't work as wanted, and it remains unsolved for now. 
+ 
+Trying same with all data (trying to see if this is caused by lack of data). 
+
+```{r}
+#Plotting all useful data we have
+# Reading the data from excel (time in minutes AND PROBABILITIES IN DECIMAL NUMBER)
+df <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", sheet = "Sheet1")
+all_data <- filter(df, products == "O-negative PRBCs" | products == "LTOWB" | products == "plasma and/or RBCs")
+print(all_data)
+
+# ggplot doesn't understand the gamma link log so not drawing the code below
+#ggplot(data = all_data, aes(x = time, y = mortality))+
+  #geom_point()+
+  #geom_smooth(method = "glm", formula = y~(x), se = FALSE, family = Gamma(link="log"))
+```
+
+Then plotting with all data in excel:
+```{r}
+p <- glm(mortality ~ time, data = all_data, family = Gamma(link = "log"))
+p
+
+# Making timepoints
+variable_time <- data.frame(time=seq(0, 40500, by=420))
+tmp <- predict(object = p, newdata = variable_time, type="response")
+
+simulation.data <- data.frame(time = variable_time, mortality = tmp)
+ggplot(simulation.data, aes(x = time, y = mortality))+
+  geom_point() + geom_point(data = all_data, color = "blue")
+```
+Didn't solve the problem. Checking also if adding interaction with articles would change anything. 
+```{r}
+p <- glm(mortality ~ time*ArticleAbbr, data = all_data, family = Gamma(link = "log"))
+p
+```
+AIC is getting smaller, which is a nice thing. Trying to plot with this interaction:
+
+```{r}
+# Making timepoints
+variable_time <- data.frame(time=seq(0, 40500, by=420), ArticleAbbr=rep("Cassignol 2020",length(tmp)))
+tmp <- predict(object = p, newdata = variable_time, type="response")
+
+simulation.data <- data.frame(time = variable_time$time, mortality = tmp)
+ggplot(simulation.data, aes(x = time, y = mortality))+
+  geom_point() + geom_point(data = all_data, color = "blue")
+
+
+```
+The curve just gets slighter. This is clearly not working. Simulating more points to see what happens to the curve when the time goes by. 
+
+```{r}
+p <- glm(mortality ~ time, data = all_data, family = Gamma(link = "log"))
+p
+
+# Making timepoints
+variable_time <- data.frame(time=seq(0, 400500, by=420))
+tmp <- predict(object = p, newdata = variable_time, type="response")
+
+simulation.data <- data.frame(time = variable_time, mortality = tmp)
+ggplot(simulation.data, aes(x = time, y = mortality))+
+  geom_point() + geom_point(data = all_data, color = "blue")
+```
+Well it is clearly wrong way round. This problem remains unsolved and has to be rethought in the fall.
+Also checked how the suspicious model y ~ log(x) works in the long run:
+```{r}
+p <- glm(mortality ~ log(time), data = all_data, family = Gamma(link = "log"))
+p
+
+# Making timepoints
+variable_time <- data.frame(time=seq(0, 400500, by=420))
+tmp <- predict(object = p, newdata = variable_time, type="response")
+
+simulation.data <- data.frame(time = variable_time, mortality = tmp)
+ggplot(simulation.data, aes(x = time, y = mortality))+
+  geom_point() + geom_point(data = all_data, color = "blue")
+```
+Seems more reasonable than the other one but as said before, I don't know if this is okay to do like this or how this is interpreted...
+ 

@@ -1,0 +1,191 @@
+---
+title: "simple_curve_fitting"
+author: "Milla Juntunen"
+date: '2022-07-15'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+*** CURVE FITTING & SIMULATING NEW DATA ***
+
+This code tries to fit different curves in the existing data about prehospital blood transfusion's effect on mortality rate, pick up the model that is considered the best one and then simulate new data points. 
+
+This is done separately to all blood products. At the end all products are combined to see if it makes any difference. 
+
+All results are plotted below. 
+```{r}
+source("simulating_timepoints.R")
+library("readxl")
+library("ggplot2")
+library("dplyr")
+library("npreg")
+```
+
+```{r}
+# Reading the data from excel (time in minutes)
+df <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", sheet = "all_min")
+```
+
+Simulating new data points. For more information, see simulating_timepoints.Rmd
+```{r}
+# Making simulated data
+simulated_times <- make_timepoints.function(20)
+```
+*** PRCBs ***
+
+Filtering different blood products from the data. Trying first with PRBCs (packed red blood cells).  
+```{r}
+# Filtering rows by products (only some of them are useful at a time)
+PRBCS_data <- filter(df, products == "O-negative PRBCs" )
+print(PRBCS_data)
+```
+
+Testing different models to see which one is the best fit.
+```{r}
+ggplot(PRBCS_data, aes(x = time, y = mortality) ) +
+    geom_point() +
+    geom_line() +
+    geom_smooth(aes(color="No special method or formula"), se = FALSE,  linetype = 1) +
+    geom_smooth(method="lm", aes(color="Linear Model"), formula= (y ~ x), se = FALSE, linetype = 2) +
+    geom_smooth(method="lm", aes(color="2. deg polynome"), formula= (y ~ poly(x,2)), se = FALSE, linetype = 3) +
+    geom_smooth(method = "lm", aes(color="Log model"), formula = y ~ log(x), se = FALSE, linetype = 3) +
+    guides(color = guide_legend("Model Type"))
+```
+It seems that the logarithmic curve could be the best one, so using it to simulate new data. 
+
+Simulating new data points. Forcing the curve to start from 0 (at that time it is assumed that everyone is still alive.). Adding some noise to the simulated data at the same time. 
+```{r}
+# Predicting new points
+my_model <- lm(mortality~0+log(time), data = PRBCS_data)
+variable_time <- data.frame(time=simulated_times)
+predicted_y <- predict(object = my_model, newdata = variable_time)
+
+# Adding some noise to predicted_y
+for(i in 1:length(predicted_y)){
+  predicted_y[i] <- rnorm(1, predicted_y[i],1)
+}
+
+# Making combined dataframe from original and simulated data
+original.data <- data.frame(time = PRBCS_data$time, mortality = PRBCS_data$mortality)
+simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
+all.data <- rbind(original.data, simulation.data)
+```
+
+Plotting the results about PRCBs, curves with raw data, simulated data and with both points combined.
+```{r}
+# Plotting the combined data and the simulated and original points (O-neg PRBCs)
+ggplot(all.data, aes(x = time, y = mortality))+
+  geom_smooth(method = "lm", aes(color="all.data"), formula = y~0+log(x), se = FALSE, linetype = 1)+
+  geom_point(data = original.data) +
+  geom_smooth(data = original.data, method = "lm", aes(color="original.data"), formula = y~0+log(x), se = FALSE, linetype = 2) +
+  geom_point(data = simulation.data, color = "blue")+
+  geom_smooth(data = simulation.data, aes(x = simulated_times, y = predicted_y, color = "simulation.data"), linetype = 2)+
+  guides(color = guide_legend("Data"))
+```
+
+*** PRBCS AND/OR PLASMA *** 
+
+Done as above, changing product. 
+```{r}
+# Filtering PRBCS_and_plasma_data:
+PRBCS_and_plasma_data <- filter(df, products == "plasma and/or RBCs" )
+print(PRBCS_and_plasma_data)
+
+# Making simulated data (using same simulated time points as earlier)
+my_model <- lm(mortality~0+log(time), data = PRBCS_and_plasma_data)
+variable_time <- data.frame(time=simulated_times)
+predicted_y <- predict(object = my_model, newdata = variable_time)
+
+# Adding some noise to predicted_y
+for(i in 1:length(predicted_y)){
+  predicted_y[i] <- rnorm(1, predicted_y[i],1)
+}
+# Making combined data frame from original and simulated data
+original.data <- data.frame(time = PRBCS_and_plasma_data$time, mortality = PRBCS_and_plasma_data$mortality)
+simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
+all.data <- rbind(original.data, simulation.data)
+```
+
+```{r}
+# Plotting the combined data and the simulated and original points (plasma and/or RCBs)
+ggplot(all.data, aes(x = time, y = mortality))+
+  geom_smooth(method = "lm", aes(color="all.data"), formula = y~0+log(x), se = FALSE, linetype = 1)+
+  geom_point(data = original.data) +
+  geom_smooth(data = original.data, method = "lm", aes(color="original.data"), formula = y~0+log(x), se = FALSE, linetype = 2) +
+  geom_point(data = simulation.data, color = "blue")+
+  geom_smooth(data = simulation.data, aes(x = simulated_times, y = predicted_y, color = "simulation.data"), linetype = 2)+
+  guides(color = guide_legend("Data"))
+```
+Combination of red blood cells and plasma is the only product that has higher than 25% mortality according to these plots, the simulated time points have also the greatest distribution compared to other products... 
+
+
+*** WHOLE BLOOD *** 
+Done as above, changing product. 
+
+Had an issue with negative mortality rates near zero at first, but it was solved by forcing the intercept to 0. However, this made the curve a lot lower, which might be problematic. 
+
+```{r}
+# Filtering whole blood:
+WB_data <- filter(df, products == "LTOWB" )
+print(WB_data)
+
+# Making simulated data (using same simulated time points as earlier)
+my_model <- lm(mortality~0+log(time), data = WB_data)
+variable_time <- data.frame(time=simulated_times)
+predicted_y <- predict(object = my_model, newdata = variable_time)
+
+# Adding some noise to predicted_y
+for(i in 1:length(predicted_y)){
+  predicted_y[i] <- rnorm(1, predicted_y[i],1)
+}
+# Making combined data frame from original and simulated data
+original.data <- data.frame(time = WB_data$time, mortality = WB_data$mortality)
+simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
+all.data <- rbind(original.data, simulation.data)
+```
+
+```{r}
+# Plotting the combined data and the simulated and original points (WB)
+ggplot(all.data, aes(x = time, y = mortality))+
+  geom_smooth(method = "lm", aes(color="all.data"), formula = y~0+log(x), se = FALSE, linetype = 1)+
+  geom_smooth(data = original.data, method = "lm", aes(color="original.data"), formula = y~0+log(x), se = FALSE, linetype = 2) +
+  geom_point(data = original.data) +
+  geom_point(data = simulation.data, color = "blue")+
+  geom_smooth(data = simulation.data, aes(x = simulated_times, y = predicted_y, color = "simulation.data"), linetype = 2)+
+  guides(color = guide_legend("Data"))
+```
+This curve doesn't seem as good fit as the others, the mortality is quite low compared to the time points in original data from the excel. Not sure if this could be prevented by deleting time points from the start (other products have less or no time points for example at 3 hours (360 min)).
+
+*** ALL PRODUCTS COMBINED ***
+
+```{r}
+all_products <- filter(df, products == "O-negative PRBCs" | products == "LTOWB" | products == "plasma and/or RBCs")
+print(all_products)
+
+# Making simulated data (using same simulated time points as earlier)
+my_model <- lm(mortality~0+log(time), data = all_products)
+variable_time <- data.frame(time=simulated_times)
+predicted_y <- predict(object = my_model, newdata = variable_time)
+
+# Adding some noise to predicted_y
+for(i in 1:length(predicted_y)){
+  predicted_y[i] <- rnorm(1, predicted_y[i],1)
+}
+# Making combined data frame from original and simulated data
+original.data <- data.frame(time = all_products$time, mortality = all_products$mortality)
+simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
+all.data <- rbind(original.data, simulation.data)
+```
+```{r}
+# Plotting the combined data and the simulated and original points
+ggplot(all.data, aes(x = time, y = mortality))+
+  geom_smooth(method = "lm", aes(color="all.data"), formula = y~0+log(x), se = FALSE, linetype = 1)+
+  geom_smooth(data = original.data, method = "lm", aes(color="original.data"), formula = y~0+log(x), se = FALSE, linetype = 2) +
+  geom_point(data = original.data) +
+  geom_point(data = simulation.data, color = "blue")+
+  geom_smooth(data = simulation.data, aes(x = simulated_times, y = predicted_y, color = "simulation.data"), linetype = 2)+
+  guides(color = guide_legend("Data"))
+```
+Well, this seems similar to the others. Since the number of data points is so small and the results between different products are quite close to each other, decided to concentrate on getting the best fit to all data points available using other modelling methods (see for example trying_glm.Rmd). 

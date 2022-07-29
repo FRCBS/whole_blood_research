@@ -190,6 +190,10 @@ time_calculator.function <- function(list_data){
   ret <- c(from, to, total_time_count, infusion_time_count, infusion_starts)
 }
 
+total_time_count <- 0
+infusion_time_count <- 0
+infusion_starts <- FALSE
+
 make_timepoints.function <- function(number_of_wanted_points){
   
   # Calculating times for transportation as many times as requested.
@@ -197,9 +201,9 @@ make_timepoints.function <- function(number_of_wanted_points){
   
   ret_times <- c()
   set.seed(2)
-  infusion_starts <- FALSE
-  total_time_count <- 0
-  infusion_time_count <- 0
+  #infusion_starts <- FALSE
+  #total_time_count <- 0
+  #infusion_time_count <- 0
   
   file_location <- "C:\\Projektit\\whole_blood_research\\excel\\EmergencyProcess_EdgeTimes.xlsx"
   sheet_name_a <- "test_times_a"

@@ -1,0 +1,90 @@
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Trying to model mortality rate after prehospital whole blood transfusion by estimating the maximum likelihood. 
+
+This phenomenon is assumed to follow a binomial distribution so that the probability for single event p_i in time point t_i is defined as p_i=a-exp(-b*t_i). 
+
+```{r}
+library("readxl")
+library("ggplot2")
+library("dplyr")
+library("npreg")
+```
+
+```{r}
+# Defining function to calculate the binomial loglikelihood
+# Input: generic parameter vector theta and data including covariates (explanatory variables) and corresponding observations (response variables)
+bin.llhood<-function(theta,data){
+  p_vec<-theta[1]-exp(-theta[2]*data[,1]) 
+  logl<-sum(data[,2]*log(p_vec)+data[,3]*log(1-p_vec))
+  return(-logl)
+}
+```
+
+```{r}
+# Reading the data from excel (time in hours!)
+df <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", sheet = "all_hours")
+
+# Filtering to get just the data from whole blood
+# Selecting only columns that are useful for the bin.llhood:
+# Time in the first column (covariate)
+# Number of patients that died in the second column ("successful events")
+# Number of patients that survived in the third column ("failed events")
+WB_data <- select(filter(df, products == "LTOWB" ), time, n_dead, n_survived)
+print(WB_data)
+```
+
+```{r}
+# Estimating the maximum likelihood using optim()
+# Defining starting values for the optimization
+a_b <- optim(c(0.01, 1), bin.llhood, data = WB_data, method="BFGS")
+
+# Plotting the results using coefficients from the optimization:
+a <- a_b$par[1]
+b <- a_b$par[2]
+
+ownFun <- function(x){
+  probs <- a-exp(-b*x)
+  return(probs)
+}
+
+x <- WB_data$time
+y <- ownFun(x)
+df2 <- data.frame(x,y)
+
+ggplot(data.frame(x), aes(x=x))+
+  geom_point(data = df2, aes(x=x, y=y))+
+  geom_function(fun = ownFun)+
+  scale_x_continuous(name = "time (in hours)",limits = c(0, 50)) +
+  scale_y_continuous(name = "mortality?", limits = c(0, 0.2))
+
+```
+The first curve seems somewhat reasonable, but the mortality rate is probably not as high as in the real life? (The third point at 720 hours is somewhere in the future, it didn't disappear!)
+
+The curve changes if the values in optim() are changed. Testing some other values to see the difference and to compare the outcomes.
+```{r}
+a_b <- optim(c(0.1, 10), bin.llhood, data = WB_data, method="BFGS")
+a <- a_b$par[1]
+b <- a_b$par[2]
+
+ownFun <- function(x){
+  probs <- a-exp(-b*x)
+  return(probs)
+}
+
+x <- WB_data$time
+y <- ownFun(x)
+df2 <- data.frame(x,y)
+
+ggplot(data.frame(x), aes(x=x)) +
+  geom_point(data = df2, aes(x=x, y=y)) +
+  geom_function(fun = ownFun) +
+  scale_x_continuous(name = "time (in hours)",limits = c(0, 25)) + # Had to change limits to see anything
+  scale_y_continuous(name = "mortality?", limits = c(0, 0.2))
+
+```
+It seems that the value for "a" is either close to 0.175 or 0.125 when changing the values to start the optimization.
+
+The first plot seems to be better (according to every article the mortality rate doesn't stop growing just after few hours like in this second plot) so let's keep those values for optim() and reject the second one.

@@ -1,0 +1,369 @@
+---
+title: "playing_with_brms"
+author: "Milla Juntunen"
+date: '2022-07-18'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#require(brms)
+#require(ggplot2)
+#require(gdata)
+#require(dplyr)
+#require(parallel)
+#require(cowplot)
+```
+
+```{r}
+library("brms")
+library("gdata")
+library("readxl")
+library("ggplot2")
+library("dplyr")
+library("parallel")
+library("cowplot")
+```
+This code tries to use brm() to model the mortality rate after prehospital blood transfusion (PHBT). Because the creator of this code is not yet capable of using this tool, this code is more about playing with the data and trying to learn how this works (no success so far). In other words, this code is a work in process, and it doesn't probably give any reasonable results about anything.
+
+First trying to get something done. Using code found from the internet (see https://tem11010.github.io/regression_brms/). They did some plotting to start playing with this:
+```{r}
+set.seed(2018)
+data(diamonds)
+
+diamonds.full <- na.omit(diamonds) %>% drop.levels # remove missing data
+diamonds.full$rows <- as.numeric(rownames(diamonds.full))
+diamonds.train <- diamonds.full %>% group_by(color, clarity) %>% sample_n(size = 30) # subset
+diamonds.keep <-   filter(diamonds.full, !rows %in% diamonds.train$rows) 
+
+# remove row in training set
+diamonds.test <- diamonds.keep[sample(nrow(diamonds.keep), 20000), ]
+
+# get rid of zero values and outliers
+diamonds.train <- diamonds.train %>% filter( x> 0, y >0, z > 0, price > 0, price < max(diamonds$price))
+diamonds.test <- diamonds.test %>% filter( x> 0, y >0, z > 0, price > 0, price < max(diamonds$price))
+
+
+plot_grid(
+  
+  ggplot()+
+    geom_point(data = diamonds.train, aes(y = price, x = carat))+
+    geom_smooth(), 
+
+  ggplot()+
+    geom_point(data = diamonds.train, aes(y = log(price), x = log(carat)))+
+    geom_smooth(), ncol = 2
+  )
+
+```
+For some reason (it was not explained in the article), they used log(y) ~ log(x). Would be nice to know why they did so...
+```{r}
+
+plot_grid(
+  
+  ggplot(data = diamonds.train, aes(y = log(price), x = clarity)) + geom_boxplot(), 
+  
+  ggplot(data = diamonds.train, aes(y = log(price), x = color)) + geom_boxplot(), 
+  
+  ggplot(data = diamonds.train, aes(y = log(price), x = log(carat), color = clarity)) + 
+         geom_point() + geom_smooth(method = "lm") + 
+         ylim(c(min(log(diamonds$price)),  max(log(diamonds$price)))), 
+  
+  ggplot(data = diamonds.train, aes(y = log(price), x = log(carat), color = color)) + 
+         geom_point() + geom_smooth(method = "lm") + 
+         ylim(c(min(log(diamonds$price)), max(log(diamonds$price)))), 
+  
+  ncol = 2)
+```
+Finally using the actual tool:
+```{r}
+
+#Testing with diamonds data if this works at all
+brm.dia <- brm(log(price) ~ log(carat), 
+             brmsfamily(family = "Gamma", link = "log"), 
+             data = na.omit(diamonds.train), 
+             chains = 4, #specify the number of Markov chains
+             cores = getOption("mc.cores", 1),
+             iter = 3000, warmup = 1500, thin = 5,
+             
+             prior =  c(prior(normal(0, 3), "b"), # set normal prior on regression coefficients (mean of 0, location of 3)
+                        
+                        prior(normal(0, 3), "Intercept"))) # set normal prior on intercept (mean of 0, location of 3)
+```
+Plotting the results about diamond data:
+```{r}
+summary(brm.dia)
+plot(conditional_effects(brm.dia),points=T)
+pp_check(brm.dia, ndraws = 50)
+```
+Now trying to do something similar with PHBT data. Using all of the products at the same time. Time is in minutes, mortality rate is a decimal number Using mortality ~ log(time) since in every other way it crashes with million errors... Should probably do something for the intercept too, I guess it should be (somewhere near) zero. 
+```{r}
+# Now trying own data
+
+# Reading the data from excel (time in minutes)
+df <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", sheet = "Sheet1")
+all_data <- filter(df, products == "O-negative PRBCs" | products == "LTOWB" | products == "plasma and/or RBCs")
+
+#brm <- brm(log(mortality) ~ log(time), 
+             #brmsfamily(family = "Gamma", link = "log"), 
+             #data = all_data, 
+             #chains = 4,
+             #cores = getOption("mc.cores", 1),
+             #iter = 3000, warmup = 1500, thin = 5,
+             
+             #prior =  c(prior(normal(0, 2), "b"),
+                        #prior(normal(0, 2), "Intercept"),
+                        #prior(gamma(0.01,0.01),class="shape")))
+```
+"Error: Family 'gamma' requires response greater than 0." Well. That is interesting. Don't really know how to prevent this. Trying something else instead... using y ~ x:
+```{r}
+brm <- brm(mortality ~ time, 
+             brmsfamily(family = "Gamma", link = "log"), 
+             data = all_data, 
+             chains = 4,
+             cores = getOption("mc.cores", 1),
+             iter = 3000, warmup = 1500, thin = 5,
+             
+             prior =  c(prior(normal(0, 2), "b"),
+                        prior(normal(0, 2), "Intercept"),
+                        prior(gamma(0.01,0.01),class="shape")))
+```
+
+Doesn't seem to be working. Trying to use y ~ log(x), it worked in gml() (don't know why though :D)
+
+```{r}
+brm.1 <- brm(mortality ~ log(time), 
+             brmsfamily(family = "Gamma", link = "log"), 
+             data = all_data, 
+             chains = 4,
+             cores = getOption("mc.cores", 1),
+             iter = 3000, warmup = 1500, thin = 5,
+             
+             prior =  c(prior(normal(0, 2), "b"),
+                        prior(normal(0, 2), "Intercept"),
+                        prior(gamma(0.01,0.01),class="shape")))
+```
+
+Getting some information of the results (not quite sure how to interpret these, should check it out)
+```{r}
+summary(brm.1)
+plot(conditional_effects(brm.1),points=T)
+pp_check(brm.1, ndraws = 20)
+```
+Well the intercept is bad, I bet there is going to be negative mortality near zero. And those plots are not good either, compared how those looked in the example. Trying to force the intercept to 0, no idea if this is okay or not (trying anyway). Tried to do like in here:
+http://paul-buerkner.github.io/brms/reference/set_prior.html 
+
+```{r}
+brm.force.zero <- brm(mortality ~ 0+0+log(time), 
+             brmsfamily(family = "Gamma", link = "log"), 
+             data = all_data, 
+             chains = 4,
+             cores = getOption("mc.cores", 1),
+             iter = 3000, warmup = 1500, thin = 5,
+             
+             prior =  c(prior(normal(0, 2), "b"),
+                        #prior(normal(0, 2), "Intercept"),
+                        prior(gamma(0.01,0.01),class="shape")))
+```
+```{r}
+summary(brm.force.zero)
+plot(conditional_effects(brm.force.zero),points=T)
+pp_check(brm.force.zero, ndraws = 20)
+```
+That's even more horrible than the first one. Don't know why it looks like that... Trying to change the values in the intercept. My best guess is that this might get it closer to 0:
+
+```{r}
+brm.intercept.test <- brm(mortality ~ log(time), 
+             brmsfamily(family = "Gamma", link = "log"), 
+             data = all_data, 
+             chains = 4,
+             cores = getOption("mc.cores", 1),
+             iter = 3000, warmup = 1500, thin = 5,
+             
+             prior =  c(prior(normal(0, 2), "b"),
+                        prior(normal(1, 0.01), "Intercept"),
+                        prior(gamma(0.01,0.01),class="shape")))
+```
+
+
+```{r}
+summary(brm.intercept.test)
+plot(conditional_effects(brm.intercept.test),points=T)
+pp_check(brm.intercept.test, ndraws = 20)
+```
+Well the intercept did get closer to 0 but it is still huge compared to the values in the data (0.something). Pictures are horrible again...
+
+Not even sure should I set the intercept to zero with some deviation, or should I get the intercept in the summary to be zero... 
+
+According to article (see https://rpubs.com/jwesner/gamma_glm)
+"The intercept represents the mean of logy when x is zero. so a value of 0.01 for the intercept would indicate a mean of exp(0.01) = 1.01"
+--> They used a model y ~ x, so it won't probably work as planned - Is it in this case something like 
+mean of logy when logx is 0...? Which happens when x = 1? This is confusing. 
+--> exp(anything inside) will be greater than zero... But I cannot figure out what that means in this mess that I have created :D
+--> Should probably make the y ~ x to work first ... 
+
+Trying if bigger numbers in y could help to solve the problem with y ~ x:
+```{r}
+brm.force.zero <- brm(mortality_percentage ~ (time), 
+             brmsfamily(family = "Gamma", link = "log"), 
+             data = all_data, 
+             chains = 4,
+             cores = getOption("mc.cores", 1),
+             iter = 3000, warmup = 1500, thin = 5,
+             
+             prior =  c(prior(normal(0, 2), "b"),
+                        prior(normal(0, 0.1), "Intercept"),
+                        prior(gamma(0.01,0.01),class="shape")))
+```
+It didn't work (surprise :D). 
+
+Trying other things done in the article even though the y ~ log(x) is rather questionable thing to do, especially when I'm confused about how it really works :D
+
+Anyway. Products used in blood transfusion and the article in which the data is gathered may have some effect on this system, so trying to take it in consideration. 
+```{r}
+brm.2 <- brm(mortality ~ log(time) + (1|products), 
+             brmsfamily(family = "Gamma", link = "log"), 
+             data = all_data, 
+             chains = 4, 
+             cores = getOption("mc.cores", 1),
+             iter = 3000, warmup = 1500, thin = 5,
+             
+             prior =  c(prior(normal(0, 2), "b"), 
+                        prior(normal(0, 2), "Intercept"), 
+                        prior(gamma(0.01,0.01),class="shape")))
+
+```
+```{r}
+summary(brm.2)
+plot(conditional_effects(brm.2),points=T)
+pp_check(brm.2, ndraws = 50)
+```
+
+```{r}
+brm.3 <- brm(mortality ~ log(time) + (1|ArticleAbbr), 
+             brmsfamily(family = "Gamma", link = "log"), 
+             data = all_data, 
+             chains = 4, #specify the number of Markov chains
+             cores = getOption("mc.cores", 1),
+             iter = 3000, warmup = 1500, thin = 5,
+             
+             prior =  c(prior(normal(0, 2), "b"),
+                        prior(normal(0, 2), "Intercept"), 
+                        prior(gamma(0.01,0.01),class="shape")))
+```
+```{r}
+summary(brm.3)
+plot(conditional_effects(brm.3),points=T)
+pp_check(brm.3, ndraws = 10)
+```
+```{r}
+brm.4 <- brm(mortality ~ log(time) + (1|products) + (1|ArticleAbbr), 
+             brmsfamily(family = "Gamma", link = "log"), 
+             data = all_data, 
+             chains = 4, #specify the number of Markov chains
+             cores = getOption("mc.cores", 1),
+             iter = 3000, warmup = 1500, thin = 5,
+             
+             prior =  c(prior(normal(0, 2), "b"),
+                        prior(normal(0, 2), "Intercept"), 
+                        prior(gamma(0.01,0.01),class="shape")))
+```
+```{r}
+summary(brm.4)
+plot(conditional_effects(brm.4),points=T)
+pp_check(brm.4, ndraws = 10)
+```
+
+```{r}
+brm.5 <- brm(mortality ~ log(time) + (1 + log(time)|products) + (1 + log(time)|ArticleAbbr), 
+             brmsfamily(family = "Gamma", link = "log"), 
+             data = all_data, 
+             chains = 4, #specify the number of Markov chains
+             cores = getOption("mc.cores", 1),
+             iter = 3000, warmup = 1500, thin = 5,
+             
+             prior =  c(prior(normal(0, 2), "b"), 
+                        prior(normal(0, 2), "Intercept"), 
+                        prior(gamma(0.01,0.01),class="shape")))
+
+loo(brm.1, brm.2, brm.3, brm.4, brm.5, cores = getOption("mc.cores", 1))
+```
+
+```{r}
+summary(brm.5)
+plot(conditional_effects(brm.5),points=T)
+pp_check(brm.5, ndraws = 10)
+```
+Well. Many plots and summaries later I guess I'm not able to say anything about the results since the y ~log(x) is probably wrong way to approach this. And the fit is quite bad, no matter what I do :D
+
+Because I'm getting a bit desperate, I'm trying to change the time to hours to see if it helps at all. Changing also decimal numbers to percents... It shouldn't help but I'll try anything now. 
+
+```{r}
+df <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", sheet = "all_hours")
+all_data <- filter(df, products == "O-negative PRBCs" | products == "LTOWB" | products == "plasma and/or RBCs")
+
+# Trying another way to do this
+brm_glm_reg <- brm(mortality_percentage~log(time), data=all_data, family=Gamma(link="log"),
+          prior=c(prior(normal(0,2),class="Intercept"),
+                  prior(normal(0, 2),class="b"),
+                  prior(gamma(0.01,0.01),class="shape")),
+          chains=4,iter=1000, cores=1)
+```
+
+```{r}
+summary(brm_glm_reg)
+plot(conditional_effects(brm_glm_reg),points=T)
+pp_check(brm_glm_reg, ndraws = 50)
+```
+This could probably be forced to zero...? Let's try. 
+
+```{r}
+brm_glm_reg_zero <- brm(mortality_percentage~0+0+log(time), data=all_data, family=Gamma(link="log"),
+          prior=c(#prior(normal(0,2),class="Intercept"),
+                  prior(normal(0, 2),class="b"),
+                  prior(gamma(0.01,0.01),class="shape")),
+          chains=4,iter=1000, cores=1)
+```
+
+```{r}
+summary(brm_glm_reg_zero)
+plot(conditional_effects(brm_glm_reg_zero),points=T)
+pp_check(brm_glm_reg_zero, ndraws = 100)
+```
+Well. This is just going in worse direction, so let's try y ~ x again :D 
+
+```{r}
+brm_glm_reg2<- brm(mortality_percentage~(time), data=all_data, family=Gamma(link="log"),
+          prior=c(prior(normal(0,2),class="Intercept"),
+                  prior(normal(0, 2),class="b"),
+                  prior(gamma(0.01,0.01),class="shape")),
+          chains=4,iter=1000, cores=1)
+```
+Some pretty bad sounding errors, but it did something!
+
+
+```{r}
+summary(brm_glm_reg2)
+plot(conditional_effects(brm_glm_reg2),points=T)
+pp_check(brm_glm_reg2, ndraws = 50)
+```
+
+Well it didn't help or the errors are trying to say that this will produce a bit unreliable results... The diamond data used log(y)~log(x), which could work for these data points (mortality_percentage is greater than 1... I don't really know if that really matters or not :D)
+
+
+```{r}
+brm_glm_reg3<- brm(log(mortality_percentage)~log(time), data=all_data, family=Gamma(link="log"),
+          prior=c(prior(normal(0,2),class="Intercept"),
+                  prior(normal(0, 2),class="b"),
+                  prior(gamma(0.01,0.01),class="shape")),
+          chains=4,iter=1000, cores=1)
+```
+```{r}
+summary(brm_glm_reg3)
+plot(conditional_effects(brm_glm_reg3),points=T)
+pp_check(brm_glm_reg3, ndraws = 50)
+```
+If I didn't know how to approach interpreting the y ~log(x) and the results, this is even more confusing. Maybe I'll just ask someone who knows how this thing works... At least it did something. 

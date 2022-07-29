@@ -1,0 +1,378 @@
+---
+title: "testing-ggplot"
+author: "Milla Juntunen"
+date: '2022-06-27'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+source("simulating_timepoints.R")
+library("readxl")
+library("ggplot2")
+library("dplyr")
+library("npreg")
+library("ggformula")
+```
+
+
+```{r}
+# Reading the data from excel (time in minutes)
+df <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", sheet = "all_min")
+
+```
+
+```{r}
+# Making simulated data
+simulated_times <- make_timepoints.function(20)
+```
+
+```{r}
+# Filtering rows by products (only some of them are useful at a time)
+PRBCS_data <- filter(df, products == "O-negative PRBCs" )
+print(PRBCS_data)
+```
+
+
+```{r}
+# Drawing points from the PRCB data
+ggplot(PRBCS_data, aes(x = time, y = mortality) ) +
+    geom_point() +
+    geom_line() +
+    geom_smooth(aes(color="No special method or formula"), se = FALSE,  linetype = 1) +
+    geom_smooth(method="lm", aes(color="Linear Model"), formula= (y ~ x), se = FALSE, linetype = 2) +
+    geom_smooth(method="lm", aes(color="2. deg polynome"), formula= (y ~ poly(x,2)), se = FALSE, linetype = 3) +
+    geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 3) +
+    guides(color = guide_legend("Model Type"))
+```
+
+
+```{r}
+# According to the pictures made from code above, it seems that the log model has the best match to data points (not a good model but using it anyway)
+
+
+# Plotting data from the excel
+ggplot(data = PRBCS_data, aes(x = time, y = mortality)) + 
+  geom_point() +
+  geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 1)+
+  guides(color = guide_legend("Model Type"))
+```
+
+
+```{r}
+my_model <- lm(mortality~0+log(time), data = PRBCS_data)
+variable_time <- data.frame(time=simulated_times)
+predicted_y <- predict(object = my_model, newdata = variable_time)
+
+# Adding some noise to predicted_y
+for(i in 1:length(predicted_y)){
+  predicted_y[i] <- rnorm(1, predicted_y[i],1)
+}
+
+# Making combined dataframe from original and simulated data
+original.data <- data.frame(time = PRBCS_data$time, mortality = PRBCS_data$mortality)
+simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
+all.data <- rbind(original.data, simulation.data)
+```
+
+
+```{r}
+# Plotting using just predicted_y, just to see how it looks
+ggplot(simulation.data, aes(x = time, y = mortality))+
+  geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 1)+
+  geom_smooth(se=FALSE)+
+  geom_point()
+  
+# Plotting the combined data and the simulated and original points
+ggplot(all.data, aes(x = time, y = mortality))+
+  geom_smooth(method = "lm", aes(color="Log model"), formula = y~0+log(x), se = FALSE, linetype = 2)+
+  geom_point(data = original.data) +
+  geom_smooth(data = original.data, method = "lm", aes(color="Log model"), formula = y~0+log(x), se = FALSE, linetype = 1, colour = "green" ) +
+  geom_point(data = simulation.data, color = "blue")+
+  geom_smooth(data = simulation.data, aes(x = simulated_times, y = predicted_y), linetype = 2, colour = "cyan")+
+  guides(color = guide_legend("Model Type"))
+
+```
+
+
+*** SAME FOR PRBCS AND/OR PLASMA NEXT *** 
+
+
+```{r}
+# Same for PRBCS_and_plasma_data:
+PRBCS_and_plasma_data <- filter(df, products == "plasma and/or RBCs" )
+print(PRBCS_and_plasma_data)
+
+# Fitting different curves (lol this is sooo wroong)
+ggplot(PRBCS_and_plasma_data, aes(x = time, y = mortality) ) +
+    geom_point() +
+    geom_line() +
+    geom_smooth(aes(color="No special method or formula"), se = FALSE,  linetype = 1) +
+    geom_smooth(method="lm", aes(color="Linear Model"), formula= (y ~ x), se = FALSE, linetype = 2) +
+    geom_smooth(method="lm", aes(color="2. deg polynome"), formula= (y ~ poly(x,2)), se = FALSE, linetype = 3) +
+    geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 3) +
+    guides(color = guide_legend("Model Type"))
+
+# Making simulated data (using same simulated time points as earlier)
+my_model <- lm(mortality~0+log(time), data = PRBCS_and_plasma_data)
+variable_time <- data.frame(time=simulated_times)
+predicted_y <- predict(object = my_model, newdata = variable_time)
+
+# Adding some noise to predicted_y
+for(i in 1:length(predicted_y)){
+  predicted_y[i] <- rnorm(1, predicted_y[i],1)
+}
+# Making combined data frame from original and simulated data
+original.data <- data.frame(time = PRBCS_and_plasma_data$time, mortality = PRBCS_and_plasma_data$mortality)
+simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
+all.data <- rbind(original.data, simulation.data)
+
+# Plotting the combined data and the simulated and original points
+ggplot(all.data, aes(x = time, y = mortality))+
+  geom_smooth(method = "lm", aes(color="Log model"), formula = y~0+log(x), se = FALSE, linetype = 1)+
+  geom_point(data = original.data) +
+  geom_point(data = simulation.data, color = "blue")+
+  guides(color = guide_legend("Model Type"))
+
+
+
+```
+```{r}
+# Same for whole blood:
+WB_data <- filter(df, products == "LTOWB" )
+print(WB_data)
+#WB_data <- WB_data[-c(3,5), ]
+print(WB_data)
+
+# Fitting different curves 
+ggplot(WB_data, aes(x = time, y = mortality) ) +
+    geom_point() +
+    geom_line() +
+    geom_smooth(aes(color="No special method or formula"), se = FALSE,  linetype = 1) +
+    geom_smooth(method="lm", aes(color="Linear Model"), formula= (y ~ x), se = FALSE, linetype = 2) +
+    geom_smooth(method="lm", aes(color="2. deg polynome"), formula= (y ~ poly(x,2)), se = FALSE, linetype = 3) +
+    geom_smooth(method = "lm", aes(color="Log model"), formula = y~0+log(x), se = FALSE, linetype = 3) +
+    guides(color = guide_legend("Model Type"))
+
+# Making simulated data (using same simulated time points as earlier)
+my_model <- lm(mortality~0+log(time), data = WB_data)
+variable_time <- data.frame(time=simulated_times)
+predicted_y <- predict(object = my_model, newdata = variable_time)
+
+# Adding some noise to predicted_y
+for(i in 1:length(predicted_y)){
+  predicted_y[i] <- rnorm(1, predicted_y[i],1)
+}
+# Making combined data frame from original and simulated data
+original.data <- data.frame(time = WB_data$time, mortality = WB_data$mortality)
+simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
+all.data <- rbind(original.data, simulation.data)
+
+# Plotting the combined data and the simulated and original points
+ggplot(all.data, aes(x = time, y = mortality))+
+  geom_smooth(method = "lm", aes(color="Log model"), formula = y~0+log(x), se = FALSE, linetype = 1)+
+  geom_point(data = original.data) +
+  geom_point(data = simulation.data, color = "blue")+
+  guides(color = guide_legend("Model Type"))
+```
+Well I guess that there cannot be negative mortality, so this model is quite bad and useless :))))) 
+
+Doing some dumb next. Trying to learn how this glm() thing works, and if it is useful at all. Using PRBCS_data
+
+```{r}
+library("ggfortify")
+
+# Reading the data from excel (time in minutes AND PROBABILITIES IN DECIMAL NUMBER)
+df <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", sheet = "Sheet1")
+PRBCS_data <- filter(df, products == "O-negative PRBCs" )
+
+set.seed(2)
+
+# Don't know if this is correct, but trying to predict new values for y based on simulated time points
+my_model <- glm(mortality ~ (time), data = PRBCS_data, family = Gamma(link = "log"))
+variable_time <- data.frame(time=simulated_times)
+predicted_y <- predict(object = my_model, newdata = variable_time, type="response")
+
+plot(simulated_times, predicted_y)
+# Adding some noise to predicted_y
+for(i in 1:length(predicted_y)){
+  cat(predicted_y[i], "is the current value in predicted_y\n")
+  #tämä on kyseenalainen
+  predicted_y[i] <- rnorm(1, predicted_y[i],0.01)
+  cat(predicted_y[i], "is the new value in predicted_y\n\n")
+}
+
+# Making combined dataframe from original and simulated data
+original.data <- data.frame(time = PRBCS_data$time, mortality = PRBCS_data$mortality)
+simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
+print(simulation.data)
+all.data <- rbind(original.data, simulation.data)
+
+
+
+p <- glm(mortality ~ time, data = original.data, family = "binomial")
+autoplot(p)
+
+```
+
+
+```{r}
+p
+```
+
+
+
+```{r}
+p <- glm(mortality ~ time, data = original.data, family = gaussian(link="log"))
+autoplot(p)
+
+```
+
+
+```{r}
+p
+```
+
+```{r}
+p <- glm(mortality ~ time, data = original.data, family = Gamma(link="log"))
+autoplot(p)
+
+```
+
+
+```{r}
+p
+```
+
+
+
+```{r}
+p <- glm(mortality ~ log(time), data = original.data, family = gaussian())
+autoplot(p)
+
+```
+```{r}
+p
+```
+
+
+
+```{r}
+# Plotting the combined data and the simulated and original points
+p <- glm(mortality ~ (time), data = original.data, family = poisson(link = log))
+
+# Making timepoints
+variable_time <- data.frame(time=seq(0, 40500, by=440))
+
+tmp <- predict(object = p, newdata = variable_time, type="response")
+
+simulation.data <- data.frame(time = variable_time, mortality = tmp)
+ggplot(simulation.data, aes(x = time, y = mortality))+
+  geom_point() + geom_point(data = original.data)
+
+
+
+```
+
+
+```{r}
+ggplot(original.data, aes(x = time, y = mortality))+
+  geom_smooth(method = "glm", formula = y~(x), se = FALSE, family = Gamma(link="log"))+
+  geom_point(data = original.data) +
+  geom_point(data = simulation.data, color = "red")+
+  geom_smooth(data = simulation.data, method = "glm", formula = y ~(x), se = FALSE, family = Gamma(link="log"), color = "green")
+```
+
+
+```{r}
+#Plotting all useful data we have
+
+# Reading the data from excel (time in minutes AND PROBABILITIES IN DECIMAL NUMBER)
+df <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", sheet = "Sheet1")
+all_data <- filter(df, products == "O-negative PRBCs" | products == "LTOWB" | products == "plasma and/or RBCs")
+
+all_data$ArticleAbbr <- c("A","A","A","B","B","C","C","D","D","D","E","E","G","G","H","H","H")
+print(all_data)
+
+#ggplot(data = all_data, aes(x = time, y = mortality))+
+  #geom_point()+
+  #geom_smooth(method = "glm", formula = y~(x), se = FALSE, family = Gamma(link="log"))
+
+p <- glm(mortality ~ time, data = all_data, family = binomial(link = "logit"))
+
+# Making timepoints
+variable_time <- data.frame(time=seq(0, 400500, by=420))
+tmp <- predict(object = p, newdata = variable_time, type="response")
+
+simulation.data <- data.frame(time = variable_time, mortality = tmp)
+ggplot(simulation.data, aes(x = time, y = mortality))+
+  geom_point() + geom_point(data = all_data, color = "blue")
+
+
+
+```
+
+```{r}
+p <- glm(mortality ~ time*ArticleAbbr, data = all_data, family = Gamma(link = "log"))
+p
+```
+
+
+```{r}
+# Making timepoints
+variable_time <- data.frame(time=seq(0, 40500, by=420), ArticleAbbr=rep("A",length(tmp)))
+tmp <- predict(object = p, newdata = variable_time, type="response")
+
+simulation.data <- data.frame(time = variable_time$time, mortality = tmp)
+ggplot(simulation.data, aes(x = time, y = mortality))+
+  geom_point() + geom_point(data = all_data)
+
+
+```
+
+```{r}
+# Reading the data from excel (time in minutes)
+df <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", sheet = "random")
+
+print(df)
+
+# Making simulated data (using same simulated time points as earlier)
+my_model <- lm(mortality~log(time), data = df)
+variable_time <- data.frame(time=simulated_times)
+predicted_y <- predict(object = my_model, newdata = variable_time)
+
+# Adding some noise to predicted_y
+for(i in 1:length(predicted_y)){
+  predicted_y[i] <- rnorm(1, predicted_y[i],1)
+}
+# Making combined data frame from original and simulated data
+original.data <- data.frame(time = df$time, mortality = df$mortality)
+simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
+all.data <- rbind(original.data, simulation.data)
+
+# Plotting the combined data and the simulated and original points
+ggplot(original.data, aes(x = time, y = mortality))+
+  geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 1)+
+  geom_point(data = original.data) +
+  #geom_point(data = simulation.data, color = "blue")+
+  guides(color = guide_legend("Model Type"))
+
+
+```
+```{r}
+# Reading the data from excel (time in minutes)
+df <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", sheet = "means_min")
+all_data <- filter(df, products == "O-negative PRBCs" | products == "LTOWB" | products == "plasma and/or RBCs")
+ggplot(all_data, aes(x = time, y = mortality))+
+  geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 1)+
+  geom_point(data = all_data)
+
+
+```
+
+
+

@@ -8,7 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
+This code draws a flowchart from an emergency process in which the prehospital blood transfusion starts during transportation. Nodes represent events and the edge values are times between them. 
 ```{r}
 library(DiagrammeR)
 
@@ -120,3 +120,5 @@ grViz(diagram = "digraph flowchart {
   
   ")
 ```
+
+Time values for the edges between nodes received by interviewing the professionals. Missing values are under investigation.

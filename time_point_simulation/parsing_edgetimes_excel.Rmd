@@ -4,7 +4,6 @@ author: "Milla Juntunen"
 date: '2022-06-29'
 output: html_document
 ---
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -122,7 +121,6 @@ time_calculator.function <- function(from_to, total_time_count, infusion_time_co
   
   # Going through list_data
   for (i in 1:length(list_data)){
-  
     # Checking if it is time to stop and exit the loop
     #if(from == stop_sign) {break}
   
@@ -173,13 +171,13 @@ time_calculator.function <- function(from_to, total_time_count, infusion_time_co
       }
     
       # Some printing to see if this works at all
-      #cat("\n")
-      #cat(as.character(lapply(row,'[[',3)),"\n")
-      #cat(lower, " is the lower limit for the time distribution\n")
-      #cat(upper, " is the upper limit for the time distribution\n")
-      #cat(random_time, " is the randomized time between limits\n")
-      #cat(total_time_count, " is the total time that has passed\n")
-      #cat(infusion_time_count, " is the time that has passed since the infusion started\n\n")
+      cat("\n")
+      cat(as.character(lapply(row,'[[',3)),"\n")
+      cat(lower, " is the lower limit for the time distribution\n")
+      cat(upper, " is the upper limit for the time distribution\n")
+      cat(random_time, " is the randomized time between limits\n")
+      cat(total_time_count, " is the total time that has passed\n")
+      cat(infusion_time_count, " is the time that has passed since the infusion started\n\n")
    
       # "to" is the next "from"
       from <- to
@@ -240,19 +238,13 @@ list_data_b <- parse_file.function(file_location, sheet_name_b)
 #print(list_data_b)
 
 set.seed(2)
-for (i in 1:20){
-
-infusion_starts <- FALSE
-total_time_count <- 0
-infusion_time_count <- 0
 
 # Drawing whether the infusion starts on the scene (chart_a) or during transportation (chart_b)
 charts <- c("chart a", "chart b")
 chart_to_follow <- charts[sample(1:length(charts),1)]
 if(chart_to_follow == "chart a"){
   list_data <- list_data_a
-} else {list_data <- list_data_b
-  }
+} else {list_data <- list_data_b}
 cat(chart_to_follow, "is the chart to follow\n")
 
 # Drawing the vehicle to go to the scene
@@ -270,6 +262,6 @@ infusion_time_count <- as.numeric(current_stage[4])
 cat("Patient transported to Shock Room!\n")
 cat(total_time_count, "is the total time from the 'Risk Analysis'\n")
 cat(infusion_time_count, "is the total time from the 'Infusion Starts'\n\n")
-}
+
 ```
 
