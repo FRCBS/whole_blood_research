@@ -16,7 +16,7 @@ This is done separately to all blood products. At the end all products are combi
 
 All results are plotted below. 
 ```{r}
-source("simulating_timepoints.R")
+source("../time_point_simulation/simulating_timepoints.R")
 library("readxl")
 library("ggplot2")
 library("dplyr")
@@ -25,7 +25,16 @@ library("npreg")
 
 ```{r}
 # Reading the data from excel (time in minutes)
-df <- read_excel("C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx", sheet = "all_min")
+if(.Platform$OS.type == "unix") {
+  file <- "../excel/Emergencyprocess_PHBT_splines.xlsx" 
+} else {
+  file <- "C:\\Projektit\\whole_blood_research\\excel\\Emergencyprocess_PHBT_splines.xlsx"
+}
+
+
+df <- read_excel(file, sheet = "all_min")
+
+
 ```
 
 Simulating new data points. For more information, see simulating_timepoints.Rmd

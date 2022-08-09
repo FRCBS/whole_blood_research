@@ -205,7 +205,13 @@ make_timepoints.function <- function(number_of_wanted_points){
   #total_time_count <- 0
   #infusion_time_count <- 0
   
-  file_location <- "C:\\Projektit\\whole_blood_research\\excel\\EmergencyProcess_EdgeTimes.xlsx"
+  if(.Platform$OS.type == "unix") {
+    file_location <- "../excel/EmergencyProcess_EdgeTimes.xlsx"
+  } else {
+    file_location <- "C:\\Projektit\\whole_blood_research\\excel\\EmergencyProcess_EdgeTimes.xlsx"
+    
+  }
+  
   sheet_name_a <- "test_times_a"
   sheet_name_b <- "test_times_b"
   from <- "Risk analysis"
