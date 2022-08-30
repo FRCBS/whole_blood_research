@@ -2,7 +2,9 @@
 title: "EmergencyProcess_Flowchart_InfusionOnTheScene"
 author: "Milla Juntunen"
 date: '2022-06-19'
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}

@@ -2,7 +2,9 @@
 title: "simple_curve_fitting"
 author: "Milla Juntunen"
 date: '2022-07-15'
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -16,7 +18,8 @@ This is done separately to all blood products. At the end all products are combi
 
 All results are plotted below. 
 ```{r}
-source("simulating_timepoints.R")
+
+source("C:/Projektit/whole_blood_research/time_point_simulation/simulating_timepoints.R")
 library("readxl")
 library("ggplot2")
 library("dplyr")
@@ -44,7 +47,7 @@ print(PRBCS_data)
 
 Testing different models to see which one is the best fit.
 ```{r}
-ggplot(PRBCS_data, aes(x = time, y = mortality) ) +
+ggplot(PRBCS_data, aes(x = time, y = mortality_percentage) ) +
     geom_point() +
     geom_line() +
     geom_smooth(aes(color="No special method or formula"), se = FALSE,  linetype = 1) +
@@ -53,12 +56,12 @@ ggplot(PRBCS_data, aes(x = time, y = mortality) ) +
     geom_smooth(method = "lm", aes(color="Log model"), formula = y ~ log(x), se = FALSE, linetype = 3) +
     guides(color = guide_legend("Model Type"))
 ```
-It seems that the logarithmic curve could be the best one, so using it to simulate new data. 
+It seems that the logaritmic curve could be the best one, so using it to simulate new data. 
 
 Simulating new data points. Forcing the curve to start from 0 (at that time it is assumed that everyone is still alive.). Adding some noise to the simulated data at the same time. 
 ```{r}
 # Predicting new points
-my_model <- lm(mortality~0+log(time), data = PRBCS_data)
+my_model <- lm(mortality_percentage~0+log(time), data = PRBCS_data)
 variable_time <- data.frame(time=simulated_times)
 predicted_y <- predict(object = my_model, newdata = variable_time)
 
@@ -68,7 +71,7 @@ for(i in 1:length(predicted_y)){
 }
 
 # Making combined dataframe from original and simulated data
-original.data <- data.frame(time = PRBCS_data$time, mortality = PRBCS_data$mortality)
+original.data <- data.frame(time = PRBCS_data$time, mortality = PRBCS_data$mortality_percentage)
 simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
 all.data <- rbind(original.data, simulation.data)
 ```
@@ -94,7 +97,7 @@ PRBCS_and_plasma_data <- filter(df, products == "plasma and/or RBCs" )
 print(PRBCS_and_plasma_data)
 
 # Making simulated data (using same simulated time points as earlier)
-my_model <- lm(mortality~0+log(time), data = PRBCS_and_plasma_data)
+my_model <- lm(mortality_percentage~0+log(time), data = PRBCS_and_plasma_data)
 variable_time <- data.frame(time=simulated_times)
 predicted_y <- predict(object = my_model, newdata = variable_time)
 
@@ -103,7 +106,7 @@ for(i in 1:length(predicted_y)){
   predicted_y[i] <- rnorm(1, predicted_y[i],1)
 }
 # Making combined data frame from original and simulated data
-original.data <- data.frame(time = PRBCS_and_plasma_data$time, mortality = PRBCS_and_plasma_data$mortality)
+original.data <- data.frame(time = PRBCS_and_plasma_data$time, mortality = PRBCS_and_plasma_data$mortality_percentage)
 simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
 all.data <- rbind(original.data, simulation.data)
 ```
@@ -132,7 +135,7 @@ WB_data <- filter(df, products == "LTOWB" )
 print(WB_data)
 
 # Making simulated data (using same simulated time points as earlier)
-my_model <- lm(mortality~0+log(time), data = WB_data)
+my_model <- lm(mortality_percentage~0+log(time), data = WB_data)
 variable_time <- data.frame(time=simulated_times)
 predicted_y <- predict(object = my_model, newdata = variable_time)
 
@@ -141,7 +144,7 @@ for(i in 1:length(predicted_y)){
   predicted_y[i] <- rnorm(1, predicted_y[i],1)
 }
 # Making combined data frame from original and simulated data
-original.data <- data.frame(time = WB_data$time, mortality = WB_data$mortality)
+original.data <- data.frame(time = WB_data$time, mortality = WB_data$mortality_percentage)
 simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
 all.data <- rbind(original.data, simulation.data)
 ```
@@ -165,7 +168,7 @@ all_products <- filter(df, products == "O-negative PRBCs" | products == "LTOWB" 
 print(all_products)
 
 # Making simulated data (using same simulated time points as earlier)
-my_model <- lm(mortality~0+log(time), data = all_products)
+my_model <- lm(mortality_percentage~0+log(time), data = all_products)
 variable_time <- data.frame(time=simulated_times)
 predicted_y <- predict(object = my_model, newdata = variable_time)
 
@@ -174,7 +177,7 @@ for(i in 1:length(predicted_y)){
   predicted_y[i] <- rnorm(1, predicted_y[i],1)
 }
 # Making combined data frame from original and simulated data
-original.data <- data.frame(time = all_products$time, mortality = all_products$mortality)
+original.data <- data.frame(time = all_products$time, mortality = all_products$mortality_percentage)
 simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
 all.data <- rbind(original.data, simulation.data)
 ```

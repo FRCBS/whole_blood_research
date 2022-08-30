@@ -3,8 +3,9 @@ title: "trying_glm"
 author: "Milla Juntunen"
 date: '2022-07-13'
 output:
-  html_document: default
   pdf_document: default
+  word_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}

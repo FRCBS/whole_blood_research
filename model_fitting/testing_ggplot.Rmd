@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r}
-source("simulating_timepoints.R")
+source("C:/Projektit/whole_blood_research/time_point_simulation/simulating_timepoints.R")
 library("readxl")
 library("ggplot2")
 library("dplyr")
@@ -40,7 +40,7 @@ print(PRBCS_data)
 
 ```{r}
 # Drawing points from the PRCB data
-ggplot(PRBCS_data, aes(x = time, y = mortality) ) +
+ggplot(PRBCS_data, aes(x = time, y = mortality_percentage) ) +
     geom_point() +
     geom_line() +
     geom_smooth(aes(color="No special method or formula"), se = FALSE,  linetype = 1) +
@@ -56,7 +56,7 @@ ggplot(PRBCS_data, aes(x = time, y = mortality) ) +
 
 
 # Plotting data from the excel
-ggplot(data = PRBCS_data, aes(x = time, y = mortality)) + 
+ggplot(data = PRBCS_data, aes(x = time, y = mortality_percentage)) + 
   geom_point() +
   geom_smooth(method = "lm", aes(color="Log model"), formula = y~log(x), se = FALSE, linetype = 1)+
   guides(color = guide_legend("Model Type"))
@@ -64,7 +64,7 @@ ggplot(data = PRBCS_data, aes(x = time, y = mortality)) +
 
 
 ```{r}
-my_model <- lm(mortality~0+log(time), data = PRBCS_data)
+my_model <- lm(mortality_percentage~0+log(time), data = PRBCS_data)
 variable_time <- data.frame(time=simulated_times)
 predicted_y <- predict(object = my_model, newdata = variable_time)
 
@@ -74,7 +74,7 @@ for(i in 1:length(predicted_y)){
 }
 
 # Making combined dataframe from original and simulated data
-original.data <- data.frame(time = PRBCS_data$time, mortality = PRBCS_data$mortality)
+original.data <- data.frame(time = PRBCS_data$time, mortality = PRBCS_data$mortality_percentage)
 simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
 all.data <- rbind(original.data, simulation.data)
 ```
@@ -108,7 +108,7 @@ PRBCS_and_plasma_data <- filter(df, products == "plasma and/or RBCs" )
 print(PRBCS_and_plasma_data)
 
 # Fitting different curves (lol this is sooo wroong)
-ggplot(PRBCS_and_plasma_data, aes(x = time, y = mortality) ) +
+ggplot(PRBCS_and_plasma_data, aes(x = time, y = mortality_percentage) ) +
     geom_point() +
     geom_line() +
     geom_smooth(aes(color="No special method or formula"), se = FALSE,  linetype = 1) +
@@ -118,7 +118,7 @@ ggplot(PRBCS_and_plasma_data, aes(x = time, y = mortality) ) +
     guides(color = guide_legend("Model Type"))
 
 # Making simulated data (using same simulated time points as earlier)
-my_model <- lm(mortality~0+log(time), data = PRBCS_and_plasma_data)
+my_model <- lm(mortality_percentage~0+log(time), data = PRBCS_and_plasma_data)
 variable_time <- data.frame(time=simulated_times)
 predicted_y <- predict(object = my_model, newdata = variable_time)
 
@@ -127,7 +127,7 @@ for(i in 1:length(predicted_y)){
   predicted_y[i] <- rnorm(1, predicted_y[i],1)
 }
 # Making combined data frame from original and simulated data
-original.data <- data.frame(time = PRBCS_and_plasma_data$time, mortality = PRBCS_and_plasma_data$mortality)
+original.data <- data.frame(time = PRBCS_and_plasma_data$time, mortality = PRBCS_and_plasma_data$mortality_percentage)
 simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
 all.data <- rbind(original.data, simulation.data)
 
@@ -149,7 +149,7 @@ print(WB_data)
 print(WB_data)
 
 # Fitting different curves 
-ggplot(WB_data, aes(x = time, y = mortality) ) +
+ggplot(WB_data, aes(x = time, y = mortality_percentage) ) +
     geom_point() +
     geom_line() +
     geom_smooth(aes(color="No special method or formula"), se = FALSE,  linetype = 1) +
@@ -159,7 +159,7 @@ ggplot(WB_data, aes(x = time, y = mortality) ) +
     guides(color = guide_legend("Model Type"))
 
 # Making simulated data (using same simulated time points as earlier)
-my_model <- lm(mortality~0+log(time), data = WB_data)
+my_model <- lm(mortality_percentage~0+log(time), data = WB_data)
 variable_time <- data.frame(time=simulated_times)
 predicted_y <- predict(object = my_model, newdata = variable_time)
 
@@ -168,7 +168,7 @@ for(i in 1:length(predicted_y)){
   predicted_y[i] <- rnorm(1, predicted_y[i],1)
 }
 # Making combined data frame from original and simulated data
-original.data <- data.frame(time = WB_data$time, mortality = WB_data$mortality)
+original.data <- data.frame(time = WB_data$time, mortality = WB_data$mortality_percentage)
 simulation.data <- data.frame(time = simulated_times, mortality = predicted_y)
 all.data <- rbind(original.data, simulation.data)
 
@@ -181,7 +181,7 @@ ggplot(all.data, aes(x = time, y = mortality))+
 ```
 Well I guess that there cannot be negative mortality, so this model is quite bad and useless :))))) 
 
-Doing some dumb next. Trying to learn how this glm() thing works, and if it is useful at all. Using PRBCS_data
+Doing some dumb things next. Trying to learn how this glm() thing works, and if it is useful at all. Using PRBCS_data
 
 ```{r}
 library("ggfortify")
@@ -324,7 +324,7 @@ p
 
 ```{r}
 # Making timepoints
-variable_time <- data.frame(time=seq(0, 40500, by=420), ArticleAbbr=rep("A",length(tmp)))
+variable_time <- data.frame(time=seq(0, 400500, by=420), ArticleAbbr=rep("A",length(tmp)))
 tmp <- predict(object = p, newdata = variable_time, type="response")
 
 simulation.data <- data.frame(time = variable_time$time, mortality = tmp)
