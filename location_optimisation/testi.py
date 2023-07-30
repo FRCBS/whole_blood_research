@@ -18,7 +18,7 @@ HOME_DIR = "."
 # Path were the data is stored.
 INPUT_DIR = HOME_DIR + "/data_"+COUNTRY+"/"
 
-KP_NUM = 393302
+KP_NUM = 10000
 SPEED = 50      # km/h
 FUEL_COST = 1   # €/km
 
@@ -28,14 +28,19 @@ hospitals_to_csv = []
 H = {}
 
 # Add hospitals to be considered as blood storage mikälie
-#hospitals = ["rovaniemi","hyvinkää","hämeenlinna","joensuu","kajaani", "kemi", "kokkola","kotka",
-             #"kuopio","lahti","lappeenranta","lohja","meilahti","mikkeli","oulu","peijas","pori",
-             #"porvoo","tampere","turku","vaasa","seinäjoki","savonlinna","jyväskylä","jorvi"]
+hospitals = ["rovaniemi","hyvinkää","hämeenlinna","joensuu","kajaani", "kemi", "kokkola","kotka",
+             "kuopio","lahti","lappeenranta","lohja","meilahti","mikkeli","oulu","peijas","pori",
+             "porvoo","tampere","turku","vaasa","seinäjoki","savonlinna","jyväskylä","jorvi"]
 
-hospitals = ["jorvi"]
+#hospitals = ["jorvi","meilahti","peijas"]
 
 # Hyva districts 
 hyva_list = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22]
+
+# Problematic ids that will mess up the files
+skip_ids = [81997,111001,232108,352151,467428,327624,70636,252923,109713,114580,
+            54275,50274,162455,412121,60408,152713,63819,150796,75107,274219,247952,
+            176713,202873,52962,523511]
 
 def handle_squarekms():
     squares = {}
@@ -46,6 +51,9 @@ def handle_squarekms():
 
     # Checking that rows fulfill the following requirements:
     rows = sorted_version.values.tolist()
+
+    # Cleaning out problematic square km² ids that will mess up the code
+    rows = [row for row in rows if int(row[0]) not in skip_ids]
 
 
     a = len(rows)
@@ -90,7 +98,13 @@ def write_files(hospital, square_km):
     Opds = []
     Ods = []
     # Reading existing data into a list
-    rows = list(csv.reader(open(INPUT_DIR+hospital+"_etäisyydet.csv", "r",encoding = "utf-8"), delimiter=","))
+    #rows = list(csv.reader(open(INPUT_DIR+hospital+"_etäisyydet.csv", "r",encoding = "utf-8"), delimiter=","))
+
+    df = pd.read_csv(INPUT_DIR+hospital+"_etäisyydet.csv", sep = ",",  usecols = ["Alkuperäinen","Kohde","Etäisyys_tulos"])
+    rows = df.sort_values(by = ["Alkuperäinen"]).values.tolist()
+
+     # Cleaning out problematic square km² ids that will mess up the code
+    rows = [row for row in rows[1:] if int(row[0]) not in skip_ids]
 
     # Creating F_testi-file containing ID of origin, type, and random lat&lon
     # Making also pickles needed for the optimization
@@ -105,9 +119,9 @@ def write_files(hospital, square_km):
         hospitals_to_csv.insert(0, hospital_to_add)
 
         print(f"Processing {hospital}")
-        print(f"Going to read {len(rows[1:])}")
+        print(f"Going to read {len(rows)}")
 
-        for row in rows[1:]:  
+        for row in rows:  
 
             row_count = row_count +1 
             square_id = int(row[0])
@@ -128,7 +142,7 @@ def write_files(hospital, square_km):
                 H[n]=square_id
                 
                 writer.writerow([square_id, "H", lat, lon])
-                H[n] = row[0]
+                H[n] = str(int(row[0]))
         
                 hours = int(t//1)   # full hours
                 hours_r = t%1       # remaining hours 0.XXX
@@ -147,6 +161,10 @@ def write_files(hospital, square_km):
         writer.writerows(hospitals_to_csv)
 
         H_dest = list(H.values())
+        #print("Values in H.dest(); ", H_dest)
+        a = type(H_dest[0])
+        #print("Type of the values in H_dest: ", a)
+        
 
         H_dest.insert(0, "name")
         transp_times.insert(0, hospital)
