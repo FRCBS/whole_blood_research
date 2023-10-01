@@ -19,7 +19,7 @@ HOME_DIR = "."
 INPUT_DIR = HOME_DIR + "/data_"+COUNTRY+"/"
 
 KP_NUM = 10000
-SPEED = 50      # km/h
+SPEED = 30      # km/h
 FUEL_COST = 1   # €/km
 
 times = []
@@ -104,7 +104,7 @@ def write_files(hospital, square_km):
     rows = df.sort_values(by = ["Alkuperäinen"]).values.tolist()
 
      # Cleaning out problematic square km² ids that will mess up the code
-    rows = [row for row in rows[1:] if int(row[0]) not in skip_ids]
+    rows = [row for row in rows if int(row[0]) not in skip_ids]
 
     # Creating F_testi-file containing ID of origin, type, and random lat&lon
     # Making also pickles needed for the optimization
@@ -137,7 +137,7 @@ def write_files(hospital, square_km):
 
                 num_of_accs = [info[8], 0]
                 Ods.insert(n, num_of_accs)
-                num_of_products = float(info[8])*2 # Assumed that two bags of products are used per accident
+                num_of_products = float(info[8]) # Assumed that 1 product is used per accident
                 Opds.insert(n,[num_of_products,0])
                 H[n]=square_id
                 
@@ -152,38 +152,49 @@ def write_files(hospital, square_km):
                 mins_r = hours_to_m%1   # remaining minutes
                 sec = int(mins_r*60)    
                 
-                transp_time = datetime.time(hours, mins, sec)
+                if hours > 23:
+                     transp_time = datetime.time(23,59,59)    
+                else:
+                    transp_time = datetime.time(hours, mins, sec)
                 transp_times.insert(n, str(transp_time))
+                #transp_time = datetime.time(hours, mins, sec)
+                #transp_times.insert(n, str(transp_time))
                 Cost.insert(n, cost)
                 n += 1
         
-        print(f"{row_count} rows read, found {n} matching ids")
+       
+
         writer.writerows(hospitals_to_csv)
 
-        H_dest = list(H.values())
-        #print("Values in H.dest(); ", H_dest)
-        a = type(H_dest[0])
-        #print("Type of the values in H_dest: ", a)
-        
 
-        H_dest.insert(0, "name")
-        transp_times.insert(0, hospital)
-        Cost.insert(0, hospital)
+    print(f"{row_count} rows read, found {n} matching ids")
+    #print("After hospital ", hospital, ", cost contains: ", Cost)
+    #print("Costs contain: ", Costs)
+    
+    H_dest = list(H.values())
+    #print("Values in H.dest(); ", H_dest)
+    a = type(H_dest[0])
+    #print("Type of the values in H_dest: ", a)
+    
 
-        Costs.insert(0, Cost)
-        times.insert(0, transp_times)
+    H_dest.insert(0, "name")
+    transp_times.insert(0, hospital)
+    Cost.insert(0, hospital)
 
-        with open(INPUT_DIR+'Dt.csv', 'w+', newline='', encoding = "utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(H_dest)
-            writer.writerows(times)
-        file.close()
+    Costs.insert(0, Cost)
+    times.insert(0, transp_times)
 
-        with open(INPUT_DIR+'Cd.csv', 'w+', newline='', encoding = "utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(H_dest)
-            writer.writerows(Costs)
-        file.close()
+    with open(INPUT_DIR+'Dt.csv', 'w+', newline='', encoding = "utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(H_dest)
+        writer.writerows(times)
+    file.close()
+
+    with open(INPUT_DIR+'Cd.csv', 'w+', newline='', encoding = "utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(H_dest)
+        writer.writerows(Costs)
+    file.close()
 
     file.close
 
@@ -226,3 +237,23 @@ for hospital in hospitals:
     write_files(hospital, square_km)
 
 
+
+
+# Let's see what is inside the pickles
+#with open(INPUT_DIR+'H.pickle', 'rb') as handle:
+#		H = pickle.load(handle)
+
+#print("H.pickle contains: ", H)
+
+
+# Matrix cells contain the total number of products in direct transports .
+#with open(INPUT_DIR+'OPd.pickle', 'rb') as handle:
+    #OPd = pickle.load(handle)
+
+#print("OPd.pickle contains: ",OPd)
+
+# Matrix cells contain the total number of direct transports.
+#with open(INPUT_DIR+'Od.pickle', 'rb') as handle:
+    #Od = pickle.load(handle)
+
+#print("Od.pickle contains: ",Od)

@@ -1,0 +1,240 @@
+---
+title: ""
+output: html_document
+date: "2023-08-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(sf)
+library(mapsFinland)
+```
+
+Reading the file containing optimization results for further investigation and plotting some overall information:
+
+```{r}
+library(tidyverse)
+df <- read.csv("/home/juntunenmi/Projects/facility_location_bloodsupply/data_NL/tulostiedosto.csv", sep =",")
+colnames(df)[1]<-"time_limit"
+colnames(df)[4]<-"num_of_hospitals"
+
+time_limits <- c(
+                    `45` = "45 min",
+                    `60` = "60 min",
+                    `75` = "75 min",
+                    `90` = "90 min"
+                    )
+
+df %>%
+  group_by(time_limit, speed) %>%
+  ggplot(aes(x = num_of_hospitals, y = rod, color = factor(speed))) + 
+  geom_point() +
+  ggtitle("Optimization results", subtitle ="Percentage of reached trauma scenes with different time limits, speeds and numbers of hospitals")+
+  labs(x = "Number of hospitals in use", y = "Reached trauma scenes (%)", color = "Speed (km/h)")+
+  facet_wrap(.~time_limit,labeller = as_labeller(time_limits))
+
+```
+
+Seems that almost all of the trauma scenes can be reached within 60 minutes. Drones could probably fly 70 km/h, so drawing the results in a map with that information. Reading the file containing optimization results with time limit 60 min and speed 70 km/h for further investigation:
+
+```{r}
+a <- read.csv("/home/juntunenmi/Projects/facility_location_bloodsupply/.results/DATA_D_T/NL_E/t_60_s_70_outputs.csv", sep =",")
+a
+# n is used to specify how many (5, 10, 15, 20 or 25) hospitals is used in optimization
+n = 1
+```
+
+```{r}
+unreachable_points <- a$'unreachable'
+hospitals_used <- a$'open_locs'
+
+n_points <- strsplit(unreachable_points[n], split = ',')
+n_hospitals <-strsplit(hospitals_used[n], split = ',')
+
+separated_hospitals <- n_hospitals[[1]]
+separated_points <- n_points[[1]]
+```
+
+Reading the F.csv file containing the trauma scene and hospital points and coordinates, selecting only trauma points (F.csv doesn't contain the correct coordinates for hospitals at the moment)
+
+```{r}
+f <- read.csv("/home/juntunenmi/Projects/facility_location_bloodsupply/data_NL/F.csv", sep =",")
+f_H <- filter(f, type == 'H')
+```
+
+Dividing trauma scene points into two different data frames depending on if they were or weren't reached after optimization:
+
+```{r}
+id_u <- c()
+id_u_lat <- c()
+id_u_lon <- c()
+
+id_r <- c()
+id_r_lat <- c()
+id_r_lon <- c()
+
+for (row in 1:nrow(f_H)){
+  id = f_H[row, "name"]
+  lat = f_H[row, "lat"]
+  lon = f_H[row, "lon"]
+  if(id %in% separated_points){
+    id_u <- c(id_u,id)
+    id_u_lat <- c(id_u_lat, lat)
+    id_u_lon <- c(id_u_lon, lon)
+    #print(paste("ID", id, "is in unreachable points with coordinates", lat,"(lat)", lon, "(lon)"))
+  }else{
+    id_r <- c(id_r,id)
+    id_r_lat <- c(id_r_lat, lat)
+    id_r_lon <- c(id_r_lon, lon)
+  }
+}
+
+df_unreachable <- data.frame(id_u_lat, id_u_lon, id_u)
+colnames(df_unreachable)[2]<-"Lat"
+colnames(df_unreachable)[1]<-"Lon"
+
+df_reachable <- data.frame(id_r_lat, id_r_lon, id_r)
+colnames(df_reachable)[2]<-"Lat"
+colnames(df_reachable)[1]<-"Lon"
+
+```
+
+Dividing hospitals into two different data frames depending on if they were or weren't selected to be used after the optimization:
+
+```{r}
+
+df_hospitals <- read.csv("/home/juntunenmi/Projects/facility_location_bloodsupply/data_NL/sairaalat.csv", sep =",")
+
+# Fixing Vantaa, Espoo, Helsinki to Peijas, Jorvi, Meilahti
+df_hospitals$name[df_hospitals$name == "Espoo"] <- "jorvi"
+df_hospitals$name[df_hospitals$name == "Vantaa"] <- "peijas"
+df_hospitals$name[df_hospitals$name == "Helsinki"] <- "meilahti"
+
+usedh_name <- c()
+usedh_lat <- c()
+usedh_lon <- c()
+
+unusedh_name <- c()
+unusedh_lat <- c()
+unusedh_lon <- c()
+
+for (row in 1:nrow(df_hospitals)){
+  
+  hospital <-tolower(df_hospitals[row, "name"])
+  lat <-df_hospitals[row, "lat"]
+  lon <-df_hospitals[row, "lon"]
+  
+  if(hospital %in% separated_hospitals){
+    #print(paste(hospital, "found in used hospitals"))
+    usedh_name <- c(usedh_name,hospital)
+    usedh_lat <- c(usedh_lat, lat)
+    usedh_lon <- c(usedh_lon, lon)
+  }
+  else{
+    #print(paste(hospital, "not found in used hospitals"))
+    unusedh_name <- c(unusedh_name,hospital)
+    unusedh_lat <- c(unusedh_lat, lat)
+    unusedh_lon <- c(unusedh_lon, lon)
+  }
+}
+
+# Coordinates look funny since they are in quite interesting order in the F.csv file, guess the mistake is in that code (lon / lat in wrong order)
+
+df_usedhospitals <- data.frame(usedh_lat, usedh_lon, usedh_name)
+colnames(df_usedhospitals)[2]<-"Lat"
+colnames(df_usedhospitals)[1]<-"Lon"
+
+df_unusedhospitals <- data.frame(unusedh_lat, unusedh_lon, unusedh_name)
+colnames(df_unusedhospitals)[2]<-"Lat"
+colnames(df_unusedhospitals)[1]<-"Lon"
+```
+
+Drawing selected hospitals and reachable trauma scene points with red and pink. Hospitals that were not selected and trauma points that were not reached are drawn with black and grey.
+
+```{r}
+g <- maakunta2019 %>%
+  st_transform(st_crs(3067)) %>%
+  ggplot() + 
+  geom_sf() +
+  ggtitle("Reached map points with 5 hospitals") + 
+  geom_point(data = df_unreachable, aes(Lon, Lat), size = 0.3, color="grey") + 
+  geom_point(data = df_reachable, aes(Lon, Lat), size = 0.3, color="pink") + 
+  geom_point(data = df_usedhospitals, aes(Lon, Lat), size = 1, color="orangered")+ 
+  geom_point(data = df_unusedhospitals, aes(Lon, Lat), size = 1,  color="black")
+  
+g
+```
+Plotting also maps illustrating population density and all trauma cases per km² in Finland based on our data set. First the population density: 
+
+```{r}
+df <- read.csv("/home/juntunenmi/Projects/facility_location_bloodsupply/data_NL/1x1km_ruudut.csv", sep =";")
+# Filtering rows (and thus points) containing no population, resulting map won't make any sense otherwise.
+df <- filter(df, df$asukasluku>0)
+asukasluku <- df$asukasluku
+
+g <- maakunta2019 %>%
+  st_transform(st_crs(3067)) %>%
+  ggplot() + 
+  geom_sf() +
+  ggtitle("Population density in Finland") + 
+  geom_point(data = df, aes(euref_x, euref_y, color = asukasluku), size = 0.000001) + 
+  labs(x = "Lon", y = "Lat", color = "Population per km²")+
+  scale_colour_gradientn(colours = heat.colors(8), breaks = c(1,10,100, 1000,5000), trans = "log10")
+  
+g
+```
+And now the traumas:
+
+```{r}
+df <- read.csv("/home/juntunenmi/Projects/facility_location_bloodsupply/data_NL/1x1km_ruudut.csv", sep =";")
+
+# Changing the "," to "." in a looong and difficult way since I'm not the R wizard
+convert_number <- function(x){
+  x <- as.character(x)
+  x <- gsub(pattern = ",", replacement = ".", x = x, fixed = TRUE)
+  x <- as.numeric(x)
+  return(x)
+}
+
+df$trauma_saatto_enn <- convert_number(df$trauma_saatto_enn)
+```
+
+
+```{r}
+ggplot(data = df, aes(x = trauma_saatto_enn*10))+
+  geom_histogram(binwidth = 0.01)+
+  geom_vline(aes(xintercept = 0.1140016), color = "red", linewidth = 0.1)+
+  scale_x_log10()+
+  scale_y_log10()+
+  labs(x = "Predicted traumas per km² in 10 years", y = "Count")
+  #coord_cartesian(ylim=c(0,1000))
+```
+
+```{r}
+# Filtering rows (and thus points) containing zero traumas, map won't make any sense otherwise. 
+df <- filter(df, df$trauma_saatto_enn > 0)
+traumas <- df$trauma_saatto_enn*10 # Used the prediction over 10 years for the optimization, so mapping the same values
+
+g <- maakunta2019 %>%
+  st_transform(st_crs(3067)) %>%
+  ggplot() + 
+  geom_sf() +
+  ggtitle("Predicted traumas in 10 years") + 
+  geom_point(data = df, aes(euref_x, euref_y, color = traumas), size = 0.000001) +
+  labs(x = "Lon", y = "Lat", color = "Traumas per km²")+
+  scale_colour_gradientn(colours = topo.colors(5), breaks = c(0.1,1.0, 5, 15), trans = "log10")
+  
+g
+```
+
+
+```{r}
+df <- read.csv("/home/juntunenmi/Projects/facility_location_bloodsupply/data_NL/1x1km_ruudut.csv", sep =";")
+ggplot(data = df, aes(x = trauma_saatto_enn)) +
+  geom_histogram()
+```
+
